@@ -495,9 +495,25 @@ class DownloadService {
     var downloadDirectory = await getDownloadDirectory();
     var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
 
-    return PlaybackInfoResponseSerializer.fromJson(
+    var info = PlaybackInfoResponseSerializer.fromJson(
         await File("$downloadPath${Platform.pathSeparator}playback_info.json")
             .readAsString());
+    // downloaded subtitles are stored as absolute file paths too
+    return info.rebuild((b) {
+      for (int i = 0; i < b.mediaSources.length; i++) {
+        b.mediaSources[i] = b.mediaSources[i].rebuild((ms) {
+          final streams = ms.mediaStreams.build().map((stream) {
+            final url = stream.deliveryUrl;
+            if (url == null || url.startsWith("http")) {
+              return stream;
+            }
+            return stream.rebuild(
+                (st) => st..deliveryUrl = relocatePath(url, downloadDirectory));
+          }).toList();
+          ms.mediaStreams.replace(streams);
+        });
+      }
+    });
   }
 
   Future<String> getMetadataImagePath() async {
@@ -521,6 +537,15 @@ class DownloadService {
             .readAsString();
 
     var metadata = DownloadMetadata.fromJson(json.decode(metadataString));
+    if (metadata.path != null) {
+      metadata.path = relocatePath(metadata.path!, downloadDirectory);
+    }
+    if (metadata.path == null || !await File(metadata.path!).exists()) {
+      // Fall back to whatever playable file is in the folder. The stored
+      // name can differ from the real one (e.g. a container reported as
+      // "mov,mp4,m4a" while the file was saved as ".mp4").
+      metadata.path = await _findPlayableFile(downloadPath) ?? metadata.path;
+    }
 
     return metadata;
   }
@@ -758,6 +783,36 @@ class DownloadService {
       await Directory(downloadPath).delete(recursive: true);
     }
     _notifyChanged();
+  }
+
+  /// Downloads store absolute file paths, but iOS moves the app's data
+  /// folder (a new container id) whenever the app is reinstalled or updated,
+  /// which made every saved path point at a folder that no longer exists.
+  /// This maps a stored path onto the current downloads folder.
+  static String relocatePath(String storedPath, String downloadDirectory) {
+    if (storedPath.startsWith(downloadDirectory)) return storedPath;
+    const marker = "/jellyflix/downloads/";
+    final normalized = storedPath.replaceAll("\\", "/");
+    final index = normalized.lastIndexOf(marker);
+    if (index == -1) return storedPath;
+    final relative = normalized.substring(index + marker.length);
+    return "$downloadDirectory${Platform.pathSeparator}${relative.replaceAll("/", Platform.pathSeparator)}";
+  }
+
+  Future<String?> _findPlayableFile(String downloadPath) async {
+    final main = File("$downloadPath${Platform.pathSeparator}main.m3u8");
+    if (await main.exists()) return main.path;
+    final dir = Directory(downloadPath);
+    if (!await dir.exists()) return null;
+    await for (var entity in dir.list()) {
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (entity is File &&
+          name.startsWith("$itemId.") &&
+          !name.startsWith("temp_")) {
+        return entity.path;
+      }
+    }
+    return null;
   }
 
   static Future<String> getDownloadDirectory() async {

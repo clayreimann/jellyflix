@@ -58,4 +58,17 @@ void main() {
     expect(states.length, 1);
     expect(calls, 1);
   });
+
+  test('saved paths follow the app folder after a reinstall', () {
+    const now = "/var/mobile/Containers/Data/Application/NEW-ID/Documents/jellyflix/downloads";
+    expect(
+        DownloadService.relocatePath(
+            "/var/mobile/Containers/Data/Application/OLD-ID/Documents/jellyflix/downloads/abc/main.m3u8",
+            now),
+        "$now/abc/main.m3u8");
+    expect(DownloadService.relocatePath("$now/abc/abc.mp4", now),
+        "$now/abc/abc.mp4");
+    expect(DownloadService.relocatePath("/somewhere/else.mp4", now),
+        "/somewhere/else.mp4");
+  });
 }

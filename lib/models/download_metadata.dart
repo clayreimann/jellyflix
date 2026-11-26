@@ -9,7 +9,9 @@ class DownloadMetadata {
   final String? seriesId;
   final int? indexNumber;
   final int? parentIndexNumber;
-  final String? path;
+  /// Absolute path of the playable file. Relocated to the current app
+  /// folder when read (see DownloadService.relocatePath).
+  String? path;
   final int? downloadSize;
   // Added for richer offline browsing. All optional so metadata written by
   // older versions of the app can still be read.
