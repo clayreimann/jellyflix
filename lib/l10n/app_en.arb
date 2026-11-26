@@ -272,5 +272,6 @@
         "placeholders": {
             "count": {"type": "int"}
         }
-    }
+    },
+    "downloadingHeader": "Downloading"
 }

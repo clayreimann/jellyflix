@@ -22,6 +22,15 @@ import 'package:jellyflix/services/connectivity_service.dart';
 class DownloadService {
   static final Map<String, DownloadService> _instances = {};
 
+  static final StreamController<String> _changes =
+      StreamController<String>.broadcast();
+
+  /// Emits an item id whenever a download is added, removed or its metadata
+  /// changes, so lists of downloads can refresh without an app restart.
+  static Stream<String> get changes => _changes.stream;
+
+  void _notifyChanged() => _changes.add(itemId);
+
   final ApiService _api;
   CancelableOperation<void>? _download;
   late final String itemId;
@@ -409,6 +418,7 @@ class DownloadService {
     // write metadata to file
     await File("$downloadPath${Platform.pathSeparator}metadata.json")
         .writeAsString(jsonEncode(metadata));
+    _notifyChanged();
 
     // download backdrop image
     try {
@@ -420,6 +430,8 @@ class DownloadService {
     if (itemDetails.seriesId != null) {
       await _downloadSeriesPoster(itemDetails.seriesId!);
     }
+    // artwork is now on disk
+    _notifyChanged();
   }
 
   Future<void> writePlaybackInfoToFile(PlaybackInfoResponse playbackInfo,
@@ -737,6 +749,7 @@ class DownloadService {
     if (await Directory(downloadPath).exists()) {
       await Directory(downloadPath).delete(recursive: true);
     }
+    _notifyChanged();
   }
 
   static Future<String> getDownloadDirectory() async {

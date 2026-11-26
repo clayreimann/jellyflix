@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/models/download_metadata.dart';
 import 'package:jellyflix/providers/api_provider.dart';
@@ -100,6 +102,16 @@ class DownloadLibrary {
 /// show and season. Built purely from local files so it works offline.
 final downloadLibraryProvider =
     FutureProvider.autoDispose<DownloadLibrary>((ref) async {
+  // rebuild when a download starts or is removed anywhere in the app
+  Timer? debounce;
+  final sub = DownloadService.changes.listen((_) {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 300), ref.invalidateSelf);
+  });
+  ref.onDispose(() {
+    debounce?.cancel();
+    sub.cancel();
+  });
   final ids = await DownloadService.getDownloadedItems();
   final List<DownloadMetadata> all = [];
   for (var id in ids) {

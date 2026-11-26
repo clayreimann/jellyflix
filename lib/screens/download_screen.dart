@@ -104,6 +104,7 @@ class DownloadScreen extends HookConsumerWidget {
             return ListView(
               padding: const EdgeInsets.only(bottom: 40),
               children: [
+                _ActiveDownloads(library: lib),
                 if (lib.shows.isNotEmpty) ...[
                   _SectionHeader(l10n.shows),
                   Padding(
@@ -132,6 +133,40 @@ class DownloadScreen extends HookConsumerWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Everything still transferring, with live progress, at the top of the list.
+class _ActiveDownloads extends ConsumerWidget {
+  final DownloadLibrary library;
+  const _ActiveDownloads({required this.library});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final all = [
+      for (var show in library.shows) ...show.episodes,
+      ...library.movies,
+    ];
+    final active = all.where((m) {
+      final state = ref.watch(downloadStateProvider(m.id)).value;
+      return state != null && state.status != DownloadStatus.complete;
+    }).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+            "${AppLocalizations.of(context)!.downloadingHeader} (${active.length})"),
+        for (var m in active)
+          DownloadItemTile(
+            key: ValueKey("active-${m.id}"),
+            metadata: m,
+            parentBranch: ScreenPaths.downloads,
+            showSeriesName: true,
+            onRemoved: () => ref.invalidate(downloadLibraryProvider),
+          ),
+      ],
     );
   }
 }
