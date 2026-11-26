@@ -129,7 +129,11 @@ class DownloadItemTile extends ConsumerWidget {
                 ],
               ),
             ),
-            _menu(context, ref, state),
+            // vertically centered on the artwork
+            SizedBox(
+              height: (isWide ? 220 : 140) * 9 / 16,
+              child: Center(child: _menu(context, ref, state)),
+            ),
           ],
         ),
       ),
@@ -156,10 +160,9 @@ class DownloadItemTile extends ConsumerWidget {
         PopupMenuItem(
           value: "delete",
           child: ListTile(
-            leading: Icon(active
-                ? Icons.close_rounded
-                : Icons.delete_outline_rounded),
-            title: Text(active ? l10n.cancelDownload : l10n.deleteDownload),
+            leading: Icon(
+                active ? Icons.close_rounded : Icons.delete_outline_rounded),
+            title: Text(active ? l10n.cancelDownload : l10n.removeDownload),
           ),
         ),
       ],

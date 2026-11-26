@@ -273,5 +273,6 @@
             "count": {"type": "int"}
         }
     },
-    "downloadingHeader": "Downloading"
+    "downloadingHeader": "Downloading",
+    "removeDownload": "Remove Download"
 }

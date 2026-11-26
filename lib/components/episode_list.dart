@@ -98,12 +98,12 @@ class EpisodeList extends HookConsumerWidget {
                       alignment: Alignment.centerLeft,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                        child: TextButton.icon(
+                        child: FilledButton.tonalIcon(
                           icon: const Icon(Icons.download_for_offline_outlined),
-                          label: Text(AppLocalizations.of(context)!
-                              .downloadSeason),
-                          onPressed: () => _downloadSeason(context, ref,
-                              List<BaseItemDto>.from(episodes)),
+                          label: Text(
+                              AppLocalizations.of(context)!.downloadSeason),
+                          onPressed: () => _downloadSeason(
+                              context, ref, List<BaseItemDto>.from(episodes)),
                         ),
                       ),
                     ),

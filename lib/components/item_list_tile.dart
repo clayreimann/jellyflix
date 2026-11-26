@@ -13,6 +13,7 @@ class ItemListTile<T1, T2> extends HookConsumerWidget {
     this.subtitle,
     this.leading,
     this.height,
+    this.trailing,
   });
 
   final T1 item;
@@ -24,6 +25,9 @@ class ItemListTile<T1, T2> extends HookConsumerWidget {
   final Widget? subtitle;
   final Widget? leading;
   final double? height;
+
+  /// Shown just before the menu button, vertically centered.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,9 +80,10 @@ class ItemListTile<T1, T2> extends HookConsumerWidget {
                   ),
                 ),
               ),
+              if (trailing != null) trailing!,
               if (popupMenuEntries != null)
                 Align(
-                  alignment: Alignment.bottomCenter,
+                  alignment: Alignment.center,
                   child: PopupMenuButton<T2>(
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15.0)),
