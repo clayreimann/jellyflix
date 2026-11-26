@@ -216,6 +216,12 @@ class DownloadService {
       return DownloadState(DownloadStatus.complete, 100);
     }
     final settingUp = _download != null && !_download!.isCompleted;
+    if (progress == null && !isDownloading && !settingUp) {
+      final tasks = await _tasksForItem();
+      if (tasks.isEmpty) {
+        return DownloadState(DownloadStatus.notDownloaded, null);
+      }
+    }
     if (isDownloading &&
         (settingUp || !(Platform.isAndroid || Platform.isIOS))) {
       return DownloadState(DownloadStatus.downloading, progress);
@@ -294,6 +300,7 @@ class DownloadService {
             error: error);
       });
     _download = operation;
+    _notifyChanged();
     logger.verbose("Downloads: Downloading item: $itemId");
     return operation.valueOrCancellation().catchError((_) => null);
   }
@@ -520,6 +527,7 @@ class DownloadService {
 
   Future<void> resumeDownload(
       {bool onlyStalled = false, bool silent = false}) async {
+    _notifyChanged();
     // Resume download
     bool masterM3UExists = await File(
             "${await getDownloadDirectory()}${Platform.pathSeparator}$itemId${Platform.pathSeparator}master.m3u8")
@@ -1044,7 +1052,7 @@ class DownloadService {
   }
 }
 
-enum DownloadStatus { complete, downloading, paused, failed }
+enum DownloadStatus { notDownloaded, complete, downloading, paused, failed }
 
 class DownloadState {
   final DownloadStatus status;

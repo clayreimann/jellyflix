@@ -150,7 +150,9 @@ class _ActiveDownloads extends ConsumerWidget {
     ];
     final active = all.where((m) {
       final state = ref.watch(downloadStateProvider(m.id)).value;
-      return state != null && state.status != DownloadStatus.complete;
+      return state != null &&
+          state.status != DownloadStatus.complete &&
+          state.status != DownloadStatus.notDownloaded;
     }).toList();
     if (active.isEmpty) return const SizedBox.shrink();
     return Column(

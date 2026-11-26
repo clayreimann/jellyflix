@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:jellyflix/components/download_controls.dart';
+import 'package:jellyflix/components/media_row.dart';
 import 'package:jellyflix/models/download_metadata.dart';
 import 'package:jellyflix/models/screen_paths.dart';
 import 'package:jellyflix/providers/download_provider.dart';
@@ -33,11 +35,9 @@ class DownloadItemTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final itemId = metadata.id;
     final state = ref.watch(downloadStateProvider(itemId)).value;
     final size = ref.watch(downloadSizeProvider(itemId)).value;
-    final isWide = MediaQuery.of(context).size.width >= 640;
     final complete = state?.status == DownloadStatus.complete;
 
     String title;
@@ -59,126 +59,35 @@ class DownloadItemTile extends ConsumerWidget {
       if (size != null && size > 0) formatBytes(size),
     ];
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(10.0),
-      onTap: () => _play(context, ref, state),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: isWide ? 220 : 140,
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: _LocalImage(itemId: itemId),
-                    ),
-                    if (!complete)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.downloading_rounded, size: 32),
-                        ),
-                      ),
-                  ],
-                ),
+    return MediaRow(
+      image: _LocalImage(itemId: itemId),
+      imageOverlay: complete
+          ? null
+          : Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Icon(Icons.downloading_rounded, size: 32),
               ),
             ),
-            const SizedBox(width: 16.0),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  if (details.isNotEmpty)
-                    Text(
-                      details.join(" · "),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  if (!complete) ...[
-                    const SizedBox(height: 6),
-                    _StatusLine(state: state),
-                  ],
-                  if (metadata.overview != null &&
-                      metadata.overview!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      metadata.overview!,
-                      maxLines: isWide ? 3 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            // vertically centered on the artwork
-            SizedBox(
-              height: (isWide ? 220 : 140) * 9 / 16,
-              child: Center(child: _menu(context, ref, state)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _menu(BuildContext context, WidgetRef ref, DownloadState? state) {
-    final l10n = AppLocalizations.of(context)!;
-    final service = ref.read(downloadProvider(metadata.id));
-    final active = state?.status == DownloadStatus.downloading;
-    final canResume = state?.status == DownloadStatus.paused ||
-        state?.status == DownloadStatus.failed;
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert),
-      itemBuilder: (context) => [
-        if (canResume)
-          PopupMenuItem(
-            value: "resume",
-            child: ListTile(
-              leading: const Icon(Icons.play_arrow_rounded),
-              title: Text(l10n.resumeDownload),
-            ),
-          ),
-        PopupMenuItem(
-          value: "delete",
-          child: ListTile(
-            leading: Icon(
-                active ? Icons.close_rounded : Icons.delete_outline_rounded),
-            title: Text(active ? l10n.cancelDownload : l10n.removeDownload),
-          ),
-        ),
-      ],
-      onSelected: (value) async {
-        if (value == "resume") {
-          await service.resumeDownload();
-          ref.invalidate(downloadStateProvider(metadata.id));
-        } else if (value == "delete") {
-          if (active) {
-            await service.cancelDownload();
-          } else {
-            await service.removeDownload();
+      title: title,
+      details: details.join(" · "),
+      status: complete ? null : _StatusLine(state: state),
+      overview: metadata.overview,
+      trailing: DownloadStateButton(itemId: itemId),
+      menuEntries: [downloadMenuItem(context, state)],
+      onMenuSelected: (value) async {
+        if (value == downloadMenuValue) {
+          await runDownloadAction(context, ref, itemId);
+          if (state?.status != DownloadStatus.paused &&
+              state?.status != DownloadStatus.failed) {
+            onRemoved?.call();
           }
-          onRemoved?.call();
         }
       },
+      onTap: () => _play(context, ref, state),
     );
   }
 

@@ -24,16 +24,28 @@ final downloadProgressProvider = StreamProvider.autoDispose
     .family<int?, String>((ref, itemId) =>
         ref.read(downloadProvider(itemId)).downloadProgress(1));
 
-/// Polls the state of a single download. Stops polling once it's complete.
+/// The single source of truth for one item's download state, used by every
+/// screen. Polls while a download is in progress; when the item is complete
+/// or not downloaded it stops polling and waits for [DownloadService.changes]
+/// (a download being started, resumed, canceled or removed).
 final downloadStateProvider = StreamProvider.autoDispose
-    .family<DownloadState, String>((ref, itemId) async* {
+    .family<DownloadState, String>((ref, itemId) {
+  final sub = DownloadService.changes
+      .where((id) => id == itemId)
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(sub.cancel);
   final service = ref.read(downloadProvider(itemId));
-  while (true) {
-    final state = await service.getState();
-    yield state;
-    if (state.status == DownloadStatus.complete) return;
-    await Future.delayed(const Duration(seconds: 2));
-  }
+  return () async* {
+    while (true) {
+      final state = await service.getState();
+      yield state;
+      if (state.status == DownloadStatus.complete ||
+          state.status == DownloadStatus.notDownloaded) {
+        return;
+      }
+      await Future.delayed(const Duration(seconds: 2));
+    }
+  }();
 });
 
 /// Size on disk of a single download, in bytes.
