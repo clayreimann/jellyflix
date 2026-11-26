@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:jellyflix/models/playback_info_response_serializer.dart';
 import 'package:jellyflix/services/jfx_logger.dart';
@@ -170,8 +171,12 @@ class DownloadService {
   Future<void> _writeMetadata(DownloadMetadata metadata) async {
     var downloadDirectory = await getDownloadDirectory();
     var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
+    final json = metadata.toJson();
+    if (metadata.path != null) {
+      json["Path"] = toStoredPath(metadata.path!, downloadDirectory);
+    }
     await File("$downloadPath${Platform.pathSeparator}metadata.json")
-        .writeAsString(jsonEncode(metadata.toJson()));
+        .writeAsString(jsonEncode(json));
   }
 
   Future<void> _downloadItemImage(String imagePath) async {
@@ -400,8 +405,8 @@ class DownloadService {
     if (sourceInfo.transcodingUrl == null) {
       downloadSize = int.parse(
           (await _dio!.head(streamUrl)).headers.value("content-length")!);
-      path =
-          "$downloadPath${Platform.pathSeparator}${sourceInfo.id}.${sourceInfo.container}";
+      // same name the file is saved under (see _cancelableDownloadDirectStream)
+      path = "$downloadPath${Platform.pathSeparator}$itemId.${sourceInfo.container}";
     }
 
     var metadata = DownloadMetadata(
@@ -413,7 +418,8 @@ class DownloadService {
             seriesId: itemDetails.seriesId ?? "",
             indexNumber: itemDetails.indexNumber ?? 0,
             parentIndexNumber: itemDetails.parentIndexNumber ?? 0,
-            path: path,
+            // stored relative to the downloads folder, see toStoredPath
+            path: toStoredPath(path, downloadDirectory),
             downloadSize: downloadSize,
             overview: itemDetails.overview,
             seasonId: itemDetails.seasonId,
@@ -469,8 +475,8 @@ class DownloadService {
     }
 
     if (subtitle != null && subtitlePath != null) {
-      MediaStream updatedSubtitle =
-          subtitle.rebuild((b) => b..deliveryUrl = subtitlePath);
+      MediaStream updatedSubtitle = subtitle.rebuild((b) =>
+          b..deliveryUrl = toStoredPath(subtitlePath, downloadDirectory));
       streamsToKeep.add(updatedSubtitle);
     } else if (subtitle != null || subtitlePath != null) {
       throw Exception(
@@ -507,8 +513,8 @@ class DownloadService {
             if (url == null || url.startsWith("http")) {
               return stream;
             }
-            return stream.rebuild(
-                (st) => st..deliveryUrl = relocatePath(url, downloadDirectory));
+            return stream.rebuild((st) =>
+                st..deliveryUrl = resolveStoredPath(url, downloadDirectory));
           }).toList();
           ms.mediaStreams.replace(streams);
         });
@@ -538,7 +544,7 @@ class DownloadService {
 
     var metadata = DownloadMetadata.fromJson(json.decode(metadataString));
     if (metadata.path != null) {
-      metadata.path = relocatePath(metadata.path!, downloadDirectory);
+      metadata.path = resolveStoredPath(metadata.path!, downloadDirectory);
     }
     if (metadata.path == null || !await File(metadata.path!).exists()) {
       // Fall back to whatever playable file is in the folder. The stored
@@ -715,7 +721,8 @@ class DownloadService {
       var tempData = tempDownloadData.split("\n");
       var streamUrl = tempData[0];
       var contentLength = int.parse(tempData[1]);
-      var localFilePath = tempData[2];
+      var localFilePath =
+          resolveStoredPath(tempData[2], await getDownloadDirectory());
 
       // check if temp_chunk files exist
       var list = await Directory(downloadPath).list().toList();
@@ -815,10 +822,65 @@ class DownloadService {
     return null;
   }
 
+  /// Converts a file path inside the downloads folder to the form saved in
+  /// metadata: relative to the downloads folder, with "/" separators. iOS
+  /// changes the app's absolute data path on every install or update, so
+  /// absolute paths must never be persisted.
+  static String toStoredPath(String absolutePath, String downloadDirectory) {
+    final prefix = "$downloadDirectory${Platform.pathSeparator}";
+    if (absolutePath.startsWith(prefix)) {
+      return absolutePath
+          .substring(prefix.length)
+          .replaceAll(Platform.pathSeparator, "/");
+    }
+    // a path from an older app folder: keep the part under downloads/
+    final relocated = relocatePath(absolutePath, downloadDirectory);
+    if (relocated.startsWith(prefix)) {
+      return toStoredPath(relocated, downloadDirectory);
+    }
+    return absolutePath;
+  }
+
+  /// Turns a saved path back into an absolute path in the current downloads
+  /// folder. Handles both relative paths and absolute ones saved by older
+  /// versions.
+  static String resolveStoredPath(String storedPath, String downloadDirectory) {
+    final isAbsolute = storedPath.startsWith("/") ||
+        RegExp(r'^[A-Za-z]:[\\/]').hasMatch(storedPath);
+    if (!isAbsolute) {
+      return "$downloadDirectory${Platform.pathSeparator}${storedPath.replaceAll("/", Platform.pathSeparator)}";
+    }
+    return relocatePath(storedPath, downloadDirectory);
+  }
+
+  static const _filesChannel = MethodChannel("jellyflix/files");
+  static bool _excludedFromBackup = false;
+
+  /// Keeps downloads out of iCloud backups (they can be re-downloaded and
+  /// can be large). Setting it on the folder covers everything inside it.
+  static Future<void> excludeFromBackup(String path) async {
+    if (!Platform.isIOS) return;
+    try {
+      await _filesChannel.invokeMethod("excludeFromBackup", {"path": path});
+    } catch (_) {
+      // not fatal; the files just get backed up
+    }
+  }
+
   static Future<String> getDownloadDirectory() async {
     // Get download directory
     final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    return "${appDocumentsDir.path}${Platform.pathSeparator}jellyflix${Platform.pathSeparator}downloads";
+    final path =
+        "${appDocumentsDir.path}${Platform.pathSeparator}jellyflix${Platform.pathSeparator}downloads";
+    if (!_excludedFromBackup && Platform.isIOS) {
+      final dir = Directory(path);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      _excludedFromBackup = true;
+      await excludeFromBackup(path);
+    }
+    return path;
   }
 
   Future<void> downloadTranscodedStream(String streamUrl) async {
@@ -917,7 +979,8 @@ class DownloadService {
 
       // write temp_download_data to file
       await File("$downloadPath${Platform.pathSeparator}temp_download_data")
-          .writeAsString("$streamUrl\n$contentLength\n${localFile.path}");
+          .writeAsString(
+              "$streamUrl\n$contentLength\n${toStoredPath(localFile.path, await getDownloadDirectory())}");
 
       var tempFile = File("$downloadPath${Platform.pathSeparator}temp_chunk0");
 
@@ -1109,6 +1172,8 @@ class DownloadService {
     if (await Directory(downloadDir).exists()) {
       await Directory(downloadDir).delete(recursive: true);
     }
+    // the folder is recreated later and needs the flag set again
+    _excludedFromBackup = false;
     // show snackbar
     rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
         content: Text(AppLocalizations.of(navigatorKey.currentContext!)!

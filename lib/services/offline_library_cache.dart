@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:jellyflix/services/download_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:universal_io/io.dart';
@@ -27,6 +28,8 @@ class OfflineLibraryCache {
 
   OfflineLibraryCache._(this._key);
 
+  static bool _excludedFromBackup = false;
+
   static final Map<String, OfflineLibraryCache> _instances = {};
 
   factory OfflineLibraryCache.forUser(String serverAddress, String userId) {
@@ -41,6 +44,10 @@ class OfflineLibraryCache {
         "${dir.path}${Platform.pathSeparator}jellyflix${Platform.pathSeparator}library_cache");
     if (!await cacheDir.exists()) {
       await cacheDir.create(recursive: true);
+    }
+    if (!_excludedFromBackup) {
+      _excludedFromBackup = true;
+      await DownloadService.excludeFromBackup(cacheDir.path);
     }
     return File("${cacheDir.path}${Platform.pathSeparator}$_key.json");
   }

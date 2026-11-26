@@ -71,4 +71,20 @@ void main() {
     expect(DownloadService.relocatePath("/somewhere/else.mp4", now),
         "/somewhere/else.mp4");
   });
+
+  test('download paths are saved relative and resolved against today\'s folder',
+      () {
+    const before = "/var/mobile/Containers/Data/Application/OLD/Documents/jellyflix/downloads";
+    const after = "/var/mobile/Containers/Data/Application/NEW/Documents/jellyflix/downloads";
+    final stored = DownloadService.toStoredPath("$before/abc/main.m3u8", before);
+    expect(stored, "abc/main.m3u8");
+    expect(DownloadService.resolveStoredPath(stored, after),
+        "$after/abc/main.m3u8");
+    // absolute paths written by earlier builds still resolve
+    expect(DownloadService.resolveStoredPath("$before/abc/sub.vtt", after),
+        "$after/abc/sub.vtt");
+    // and are converted to relative when saved again
+    expect(DownloadService.toStoredPath("$before/abc/sub.vtt", after),
+        "abc/sub.vtt");
+  });
 }
