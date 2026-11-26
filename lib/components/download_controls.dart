@@ -76,16 +76,32 @@ PopupMenuItem<String> downloadMenuItem(
 }
 
 /// Performs whatever the current state calls for (see [downloadActionFor]).
+///
+/// [shown] is the action the user saw on screen. If the real state has
+/// moved on since (say the download finished a moment ago), nothing is done
+/// and the control just refreshes, so a tap can never remove a download the
+/// user meant to start or resume.
 Future<void> runDownloadAction(
-    BuildContext context, WidgetRef ref, String itemId) async {
+    BuildContext context, WidgetRef ref, String itemId,
+    {required DownloadAction shown}) async {
   final l10n = AppLocalizations.of(context)!;
   final messenger = ScaffoldMessenger.of(context);
   final service = ref.read(downloadProvider(itemId));
   void snack(String text) => messenger.showSnackBar(
       SnackBar(content: Text(text), duration: const Duration(seconds: 1)));
 
-  final state = await service.getState();
-  switch (downloadActionFor(state)) {
+  DownloadState? state;
+  try {
+    state = await service.getState();
+  } catch (_) {
+    state = null;
+  }
+  final actual = downloadActionFor(state);
+  if (state == null || actual != shown) {
+    ref.invalidate(downloadStateProvider(itemId));
+    return;
+  }
+  switch (actual) {
     case DownloadAction.remove:
       await service.removeDownload();
       snack(l10n.removedDownload);
@@ -188,7 +204,8 @@ class DownloadStateButton extends ConsumerWidget {
     }
     return IconButton(
       tooltip: downloadActionLabel(context, action),
-      onPressed: () => runDownloadAction(context, ref, itemId),
+      onPressed: () =>
+          runDownloadAction(context, ref, itemId, shown: action),
       icon: icon,
     );
   }

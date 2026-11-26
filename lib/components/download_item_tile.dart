@@ -80,7 +80,8 @@ class DownloadItemTile extends ConsumerWidget {
       menuEntries: [downloadMenuItem(context, state)],
       onMenuSelected: (value) async {
         if (value == downloadMenuValue) {
-          await runDownloadAction(context, ref, itemId);
+          await runDownloadAction(context, ref, itemId,
+              shown: downloadActionFor(state));
           if (state?.status != DownloadStatus.paused &&
               state?.status != DownloadStatus.failed) {
             onRemoved?.call();

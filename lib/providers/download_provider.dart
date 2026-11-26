@@ -35,18 +35,33 @@ final downloadStateProvider = StreamProvider.autoDispose
       .listen((_) => ref.invalidateSelf());
   ref.onDispose(sub.cancel);
   final service = ref.read(downloadProvider(itemId));
-  return () async* {
-    while (true) {
-      final state = await service.getState();
+  return pollDownloadState(service.getState);
+});
+
+/// Polls [getState] until the download is complete or there is no download.
+/// A failed check (for example a file being moved while it's read) is
+/// retried on the next tick instead of ending the stream, so the state can't
+/// get stuck on an old value.
+Stream<DownloadState> pollDownloadState(
+    Future<DownloadState> Function() getState,
+    {Duration interval = const Duration(seconds: 2)}) async* {
+  while (true) {
+    DownloadState? state;
+    try {
+      state = await getState();
+    } catch (_) {
+      state = null;
+    }
+    if (state != null) {
       yield state;
       if (state.status == DownloadStatus.complete ||
           state.status == DownloadStatus.notDownloaded) {
         return;
       }
-      await Future.delayed(const Duration(seconds: 2));
     }
-  }();
-});
+    await Future.delayed(interval);
+  }
+}
 
 /// Size on disk of a single download, in bytes.
 final downloadSizeProvider =

@@ -85,7 +85,8 @@ class EpisodeListTile extends ConsumerWidget {
               ],
         onMenuSelected: (value) {
           if (value == downloadMenuValue) {
-            runDownloadAction(context, ref, episode.id!);
+            runDownloadAction(context, ref, episode.id!,
+                shown: downloadActionFor(state));
           } else {
             onSelected(value);
           }

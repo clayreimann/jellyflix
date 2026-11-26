@@ -993,13 +993,22 @@ class DownloadService {
   Future<void> completeDownload() async {
     isDownloading = false;
     if (Platform.isAndroid || Platform.isIOS) {
-      var completedTasks = await FlutterDownloader.loadTasksWithRawQuery(
-              query: "SELECT * FROM task WHERE status=3") ??
-          [];
-
-      for (var task in completedTasks) {
-        if (task.status == DownloadTaskStatus.complete) {
+      // Only clean up this item's finished tasks. Removing every finished
+      // task (as before) raced with other downloads finishing at the same
+      // time, e.g. during "Download season", and the resulting errors left
+      // their rows stuck showing "pending".
+      List<DownloadTask> tasks;
+      try {
+        tasks = await _tasksForItem();
+      } catch (e) {
+        return;
+      }
+      for (var task in tasks) {
+        if (task.status != DownloadTaskStatus.complete) continue;
+        try {
           await FlutterDownloader.remove(taskId: task.taskId);
+        } catch (e) {
+          // already removed elsewhere; nothing to do
         }
       }
     }
