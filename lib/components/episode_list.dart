@@ -5,7 +5,11 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/components/episode_list_tile.dart';
 import 'package:jellyflix/components/jfx_text_theme.dart';
+import 'package:jellyflix/models/bitrates.dart';
 import 'package:jellyflix/providers/api_provider.dart';
+import 'package:jellyflix/providers/database_provider.dart';
+import 'package:jellyflix/providers/download_provider.dart';
+import 'package:jellyflix/providers/offline_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -89,6 +93,20 @@ class EpisodeList extends HookConsumerWidget {
                           );
                         }),
                   ),
+                  if (!ref.watch(isOfflineProvider) && episodes.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.download_for_offline_outlined),
+                          label: Text(AppLocalizations.of(context)!
+                              .downloadSeason),
+                          onPressed: () => _downloadSeason(context, ref,
+                              List<BaseItemDto>.from(episodes)),
+                        ),
+                      ),
+                    ),
                   ListView.builder(
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
@@ -135,5 +153,34 @@ class EpisodeList extends HookConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Queues every episode of the season that isn't already downloaded,
+  /// using the default audio/subtitle tracks and download bitrate.
+  Future<void> _downloadSeason(
+      BuildContext context, WidgetRef ref, List<BaseItemDto> episodes) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    int downloadBitrate =
+        await ref.read(databaseProvider("settings")).get("downloadBitrate") ??
+            BitRates.defaultBitrate();
+    final List<BaseItemDto> toDownload = [];
+    for (var e in episodes) {
+      final service = ref.read(downloadProvider(e.id!));
+      if (!service.isDownloading && await service.calculateProgress() == null) {
+        toDownload.add(e);
+      }
+    }
+    messenger.showSnackBar(SnackBar(
+      content: Text(l10n.downloadingSeason(toDownload.length)),
+      duration: const Duration(seconds: 2),
+    ));
+    // one at a time, so the server isn't asked to start many transcodes at once
+    for (var e in toDownload) {
+      await ref
+          .read(downloadProvider(e.id!))
+          .downloadItem(downloadBitrate: downloadBitrate);
+    }
+    ref.invalidate(downloadLibraryProvider);
   }
 }

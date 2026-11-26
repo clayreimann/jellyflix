@@ -23,11 +23,25 @@ class DownloadService {
   static final Map<String, DownloadService> _instances = {};
 
   final ApiService _api;
-  late CancelableOperation<void> _download;
+  CancelableOperation<void>? _download;
   late final String itemId;
   late final ConnectivityService connectivityService;
   late final JfxLogger logger;
-  Dio? _dio;
+  Dio? _dioInstance;
+
+  /// Created lazily, so a service made before login (e.g. while browsing
+  /// downloads offline) still works once the user is signed in.
+  Dio? get _dio {
+    if (_dioInstance == null && _api.currentUser?.serverAdress != null) {
+      _dioInstance = Dio(
+        BaseOptions(
+          headers: _api.headers,
+          baseUrl: _api.currentUser!.serverAdress!,
+        ),
+      );
+    }
+    return _dioInstance;
+  }
 
   bool isDownloading = false;
   CancelToken cancelToken = CancelToken();
@@ -59,7 +73,7 @@ class DownloadService {
     required this.logger,
   }) {
     if (_api.currentUser != null) {
-      _dio = Dio(
+      _dioInstance = Dio(
         BaseOptions(
           headers: _api.headers,
           baseUrl: _api.currentUser!.serverAdress!,
@@ -68,14 +82,14 @@ class DownloadService {
     }
     connectivityService.connectionStatusStream.listen((isConnected) {
       if (isConnected && _api.currentUser?.serverAdress != null) {
-        _dio = Dio(
+        _dioInstance = Dio(
           BaseOptions(
             headers: _api.headers,
             baseUrl: _api.currentUser!.serverAdress!,
           ),
         );
       } else {
-        _dio = null;
+        _dioInstance = null;
       }
     });
   }
@@ -84,12 +98,153 @@ class DownloadService {
     var downloadDir = await getDownloadDirectory();
 
     // get all folders in downloadDir
+    if (!await Directory(downloadDir).exists()) {
+      return [];
+    }
     var contents = await Directory(downloadDir)
         .list()
         .where((event) => event is Directory)
         .map((event) => event.path.split(Platform.pathSeparator).last)
+        // folders starting with "_" hold shared data (e.g. series artwork)
+        .where((name) => !name.startsWith("_"))
         .toList();
     return contents;
+  }
+
+  /// Directory holding shared artwork/info for a series, used by the
+  /// offline downloads browser.
+  static Future<String> getSeriesDirectory(String seriesId) async {
+    var downloadDir = await getDownloadDirectory();
+    return "$downloadDir${Platform.pathSeparator}_series${Platform.pathSeparator}$seriesId";
+  }
+
+  static Future<String> getSeriesPosterPath(String seriesId) async {
+    return "${await getSeriesDirectory(seriesId)}${Platform.pathSeparator}poster.jpg";
+  }
+
+  Future<void> _downloadSeriesPoster(String seriesId) async {
+    if (_dio == null || seriesId.isEmpty) return;
+    try {
+      var posterPath = await getSeriesPosterPath(seriesId);
+      if (await File(posterPath).exists()) return;
+      await Directory(await getSeriesDirectory(seriesId))
+          .create(recursive: true);
+      await _dio!.download(
+          _api.getImageUrl(seriesId, ImageType.primary), posterPath);
+    } catch (e) {
+      logger.warning("Downloads: Could not download series poster: $e");
+    }
+  }
+
+  /// Re-fetches item details from the server and updates the locally stored
+  /// metadata (title, description, season). Used to repair downloads whose
+  /// metadata was incomplete, so they browse nicely offline.
+  Future<void> refreshMetadata() async {
+    if (_dio == null || _api.currentUser == null) return;
+    var metadata = await getMetadata();
+    BaseItemDto details = await _api.getItemDetails(itemId);
+    metadata.name = details.name ?? metadata.name;
+    metadata.overview = details.overview ?? metadata.overview;
+    metadata.seasonId = details.seasonId ?? metadata.seasonId;
+    metadata.seasonName = details.seasonName ?? metadata.seasonName;
+    metadata.productionYear = details.productionYear ?? metadata.productionYear;
+    await _writeMetadata(metadata);
+    if (metadata.normalizedSeriesId != null) {
+      await _downloadSeriesPoster(metadata.normalizedSeriesId!);
+    }
+    var imagePath = await getMetadataImagePath();
+    if (!await File(imagePath).exists()) {
+      await _downloadItemImage(imagePath);
+    }
+  }
+
+  Future<void> _writeMetadata(DownloadMetadata metadata) async {
+    var downloadDirectory = await getDownloadDirectory();
+    var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
+    await File("$downloadPath${Platform.pathSeparator}metadata.json")
+        .writeAsString(jsonEncode(metadata.toJson()));
+  }
+
+  Future<void> _downloadItemImage(String imagePath) async {
+    try {
+      var imageUrl = _api.getImageUrl(itemId, ImageType.backdrop);
+      await _dio!.download(imageUrl, imagePath);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        var imageUrl = _api.getImageUrl(itemId, ImageType.primary);
+        await _dio!.download(imageUrl, imagePath);
+      }
+    }
+  }
+
+  Future<List<DownloadTask>> _tasksForItem() async {
+    if (!(Platform.isAndroid || Platform.isIOS)) return [];
+    return await FlutterDownloader.loadTasksWithRawQuery(
+            query:
+                "SELECT * FROM task WHERE saved_dir LIKE '%downloads${Platform.pathSeparator}$itemId%' OR file_name LIKE '$itemId.%'") ??
+        [];
+  }
+
+  /// Total bytes used on disk by this download.
+  Future<int> sizeOnDisk() async {
+    var downloadDirectory = await getDownloadDirectory();
+    var dir = Directory("$downloadDirectory${Platform.pathSeparator}$itemId");
+    if (!await dir.exists()) return 0;
+    int size = 0;
+    await for (var entity in dir.list(recursive: true)) {
+      if (entity is File) {
+        size += await entity.length();
+      }
+    }
+    return size;
+  }
+
+  /// Works out whether this download is complete, actively downloading, or
+  /// stalled (interrupted/failed and in need of a resume).
+  Future<DownloadState> getState() async {
+    int? progress = await calculateProgress();
+    if (progress == 100) {
+      return DownloadState(DownloadStatus.complete, 100);
+    }
+    final settingUp = _download != null && !_download!.isCompleted;
+    if (isDownloading &&
+        (settingUp || !(Platform.isAndroid || Platform.isIOS))) {
+      return DownloadState(DownloadStatus.downloading, progress);
+    }
+    // on mobile the transfer happens in the system's background downloader,
+    // so its task list is the source of truth
+    var tasks = await _tasksForItem();
+    if (tasks.any((t) =>
+        t.status == DownloadTaskStatus.running ||
+        t.status == DownloadTaskStatus.enqueued)) {
+      return DownloadState(DownloadStatus.downloading, progress);
+    }
+    isDownloading = false;
+    if (tasks.any((t) => t.status == DownloadTaskStatus.failed)) {
+      return DownloadState(DownloadStatus.failed, progress);
+    }
+    return DownloadState(DownloadStatus.paused, progress);
+  }
+
+  /// Resumes every download that isn't complete and isn't currently
+  /// downloading. Called when the app starts or the server becomes reachable.
+  static Future<int> resumeStalledDownloads(
+      DownloadService Function(String itemId) serviceFor) async {
+    int resumed = 0;
+    for (var id in await getDownloadedItems()) {
+      try {
+        var service = serviceFor(id);
+        var state = await service.getState();
+        if (state.status == DownloadStatus.paused ||
+            state.status == DownloadStatus.failed) {
+          await service.resumeDownload(onlyStalled: true, silent: true);
+          resumed++;
+        }
+      } catch (e) {
+        // ignore a single broken download so the others still resume
+      }
+    }
+    return resumed;
   }
 
   Future<String> getDownloadedItemPath() async {
@@ -108,11 +263,13 @@ class DownloadService {
         subtitleStreamIndex: subtitleStreamIndex));
   }
 
-  void downloadItem(
+  /// Starts a download. The returned future completes once the download has
+  /// been set up and queued (not when the file has finished transferring).
+  Future<void> downloadItem(
       {int? audioStreamIndex,
       int? subtitleStreamIndex,
       required int downloadBitrate}) {
-    _download = CancelableOperation.fromFuture(
+    final operation = CancelableOperation.fromFuture(
       _downloadItem(
         audioStreamIndex: audioStreamIndex,
         subtitleStreamIndex: subtitleStreamIndex,
@@ -127,7 +284,9 @@ class DownloadService {
         logger.error("Downloads: Error downloading item: $itemId: $stackTrace",
             error: error);
       });
+    _download = operation;
     logger.verbose("Downloads: Downloading item: $itemId");
+    return operation.valueOrCancellation().catchError((_) => null);
   }
 
   Future<void> _downloadItem(
@@ -239,7 +398,12 @@ class DownloadService {
             indexNumber: itemDetails.indexNumber ?? 0,
             parentIndexNumber: itemDetails.parentIndexNumber ?? 0,
             path: path,
-            downloadSize: downloadSize)
+            downloadSize: downloadSize,
+            overview: itemDetails.overview,
+            seasonId: itemDetails.seasonId,
+            seasonName: itemDetails.seasonName,
+            productionYear: itemDetails.productionYear,
+            downloadedAt: DateTime.now())
         .toJson();
 
     // write metadata to file
@@ -248,15 +412,13 @@ class DownloadService {
 
     // download backdrop image
     try {
-      var imageUrl = _api.getImageUrl(itemId, ImageType.backdrop);
-      await _dio!.download(
-          imageUrl, "$downloadPath${Platform.pathSeparator}image.jpg");
-    } on DioException catch (e) {
-      if (e.response!.statusCode == 404) {
-        var imageUrl = _api.getImageUrl(itemId, ImageType.primary);
-        await _dio!.download(
-            imageUrl, "$downloadPath${Platform.pathSeparator}image.jpg");
-      }
+      await _downloadItemImage(
+          "$downloadPath${Platform.pathSeparator}image.jpg");
+    } catch (e) {
+      logger.warning("Downloads: Could not download image: $e");
+    }
+    if (itemDetails.seriesId != null) {
+      await _downloadSeriesPoster(itemDetails.seriesId!);
     }
   }
 
@@ -344,7 +506,8 @@ class DownloadService {
     return metadata;
   }
 
-  Future<void> resumeDownload() async {
+  Future<void> resumeDownload(
+      {bool onlyStalled = false, bool silent = false}) async {
     // Resume download
     bool masterM3UExists = await File(
             "${await getDownloadDirectory()}${Platform.pathSeparator}$itemId${Platform.pathSeparator}master.m3u8")
@@ -355,7 +518,7 @@ class DownloadService {
     if (Platform.isAndroid || Platform.isIOS) {
       isDownloading = true;
       _download = CancelableOperation.fromFuture(
-        _resumeMobileDownload(),
+        _resumeMobileDownload(onlyStalled: onlyStalled),
         onCancel: () {
           isDownloading = false;
           logger.warning("Downloads: Download canceled");
@@ -396,7 +559,7 @@ class DownloadService {
               "Downloads: Error resuming download: $itemId: $stackTrace",
               error: error);
         });
-    } else {
+    } else if (!silent) {
       await removeDownload();
       rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
           content: Text(AppLocalizations.of(navigatorKey.currentContext!)!
@@ -404,7 +567,7 @@ class DownloadService {
     }
   }
 
-  _resumeMobileDownload() async {
+  _resumeMobileDownload({bool onlyStalled = false}) async {
     var tasks = await FlutterDownloader.loadTasksWithRawQuery(
         query:
             "SELECT * FROM task WHERE saved_dir LIKE '%downloads${Platform.pathSeparator}$itemId%'");
@@ -427,7 +590,13 @@ class DownloadService {
     }
     if (tasks != null && tasks.isNotEmpty) {
       var failedTasks = tasks
-          .where((element) => element.status != DownloadTaskStatus.complete)
+          .where((element) =>
+              element.status != DownloadTaskStatus.complete &&
+              // when resuming automatically, leave tasks that are still
+              // transferring in the background alone
+              !(onlyStalled &&
+                  (element.status == DownloadTaskStatus.running ||
+                      element.status == DownloadTaskStatus.enqueued)))
           .toList();
       if (failedTasks.isNotEmpty) {
         for (var task in failedTasks) {
@@ -557,6 +726,9 @@ class DownloadService {
   }
 
   Future<void> removeDownload() async {
+    for (var task in await _tasksForItem()) {
+      await FlutterDownloader.remove(taskId: task.taskId);
+    }
     // Remove downloaded file
     var downloadDirectory = await getDownloadDirectory();
     var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
@@ -818,14 +990,23 @@ class DownloadService {
       for (var taskId in downloadTaskIds) {
         await FlutterDownloader.cancel(taskId: taskId);
       }
+      // tasks from a previous app session aren't in downloadTaskIds
+      for (var task in await _tasksForItem()) {
+        await FlutterDownloader.remove(taskId: task.taskId);
+      }
+      downloadTaskIds = [];
     }
     // cancel the latest request
     cancelToken.cancel();
     // cancel the future
-    await _download.cancel();
+    await _download?.cancel();
     await removeDownload();
-    await _api.reportStopPlayback(0, itemId: itemId);
     cancelToken = CancelToken();
+    try {
+      await _api.reportStopPlayback(0, itemId: itemId);
+    } catch (_) {
+      // offline: nothing to report
+    }
   }
 
   static Future<void> cancelAndDeleteAllDownloads() async {
@@ -848,4 +1029,12 @@ class DownloadService {
         content: Text(AppLocalizations.of(navigatorKey.currentContext!)!
             .allDownloadsRemoved)));
   }
+}
+
+enum DownloadStatus { complete, downloading, paused, failed }
+
+class DownloadState {
+  final DownloadStatus status;
+  final int? progress;
+  DownloadState(this.status, this.progress);
 }

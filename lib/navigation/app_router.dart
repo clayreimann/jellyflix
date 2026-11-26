@@ -10,6 +10,7 @@ import 'package:jellyflix/providers/auth_provider.dart';
 import 'package:jellyflix/providers/connectivity_provider.dart';
 import 'package:jellyflix/screens/detail_screen.dart';
 import 'package:jellyflix/screens/download_screen.dart';
+import 'package:jellyflix/screens/downloaded_show_screen.dart';
 import 'package:jellyflix/screens/home_screen.dart';
 import 'package:jellyflix/screens/library_screen.dart';
 import 'package:jellyflix/screens/loading_screen.dart';
@@ -93,6 +94,15 @@ class AppRouter {
                   ),
                   routes: [
                     ...buildSharedRoutes(ScreenPaths.downloads),
+                    GoRoute(
+                      name: ScreenPaths.downloads + ScreenPaths.downloadedShow,
+                      path: ScreenPaths.downloadedShow,
+                      pageBuilder: (context, state) => CupertinoPage(
+                        child: DownloadedShowScreen(
+                          seriesId: state.uri.queryParameters['seriesId']!,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -182,9 +192,12 @@ class AppRouter {
       return const LoadingScreen();
     },
     redirect: (context, state) async {
-      final isGoingToOfflinePlayer = state.matchedLocation ==
-          '${ScreenPaths.downloads}/${ScreenPaths.player}';
-      final isGoingToDownloads = state.matchedLocation == ScreenPaths.downloads;
+      // Everything under downloads (show pages, player) and the library
+      // (served from the offline cache) works without a connection.
+      final isGoingToLibrary =
+          state.matchedLocation.startsWith(ScreenPaths.library);
+      final isGoingToDownloads =
+          state.matchedLocation.startsWith(ScreenPaths.downloads);
       final isGoingToLogin = state.matchedLocation == ScreenPaths.login;
       final isGoingToLoading = state.matchedLocation == ScreenPaths.loading;
       final isGoingToProfile = state.matchedLocation == ScreenPaths.profile;
@@ -212,7 +225,7 @@ class AppRouter {
         return null;
       } else {
         if (!isGoingToDownloads &&
-            !isGoingToOfflinePlayer &&
+            !isGoingToLibrary &&
             !isGoingToProfile &&
             !isGoingToLogin &&
             !isGoingToLoading) {

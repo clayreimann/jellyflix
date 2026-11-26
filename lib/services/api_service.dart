@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:jellyflix/navigation/app_router.dart';
 import 'package:jellyflix/services/device_info_service.dart';
 import 'package:jellyflix/services/jfx_logger.dart';
+import 'package:jellyflix/services/offline_library_cache.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:built_collection/built_collection.dart';
@@ -30,6 +31,114 @@ class ApiService {
   PlaybackInfoResponse? playbackInfo;
 
   User? get currentUser => _user;
+
+  /// True while the server is unreachable. Library calls are then answered
+  /// from [OfflineLibraryCache] instead of the network.
+  bool offline = false;
+
+  OfflineLibraryCache? get offlineCache =>
+      (_user?.serverAdress == null || _user?.id == null)
+          ? null
+          : OfflineLibraryCache.forUser(_user!.serverAdress!, _user!.id!);
+
+  /// Runs [online] and stores the result in the offline cache. When offline
+  /// (or the request fails) the cached value is returned instead.
+  Future<T> _withOfflineCache<T>({
+    required Future<T> Function() online,
+    required T? Function(OfflineLibraryCache cache) cached,
+    void Function(OfflineLibraryCache cache, T value)? store,
+  }) async {
+    final cache = offlineCache;
+    if (cache != null) await cache.ensureLoaded();
+    if (!offline) {
+      try {
+        final value = await online();
+        if (cache != null && store != null) {
+          try {
+            store(cache, value);
+          } catch (e) {
+            _logger.warning("OfflineCache: could not store value: $e");
+          }
+        }
+        return value;
+      } catch (e) {
+        final value = cache == null ? null : cached(cache);
+        if (value == null) rethrow;
+        _logger.verbose("OfflineCache: request failed, using cache: $e");
+        return value;
+      }
+    }
+    final value = cache == null ? null : cached(cache);
+    if (value == null) {
+      throw Exception("Not available offline");
+    }
+    return value;
+  }
+
+  /// Downloads metadata for every library (movies, shows, episodes) into the
+  /// offline cache. Skipped if a sync happened recently unless [force].
+  Future<void> syncOfflineLibrary({bool force = false}) async {
+    if (offline || _user == null || _jellyfinApi == null) return;
+    final cache = offlineCache!;
+    await cache.ensureLoaded();
+    if (!force &&
+        cache.syncedAt != null &&
+        DateTime.now().difference(cache.syncedAt!) <
+            const Duration(hours: 6)) {
+      return;
+    }
+    _logger.verbose("OfflineCache: syncing library");
+    final folders = await getMediaFolders();
+    for (var folder in folders) {
+      final itemsResponse = await _jellyfinApi!.getItemsApi().getItems(
+            userId: _user!.id!,
+            headers: headers,
+            parentId: folder.id,
+            recursive: true,
+            enableTotalRecordCount: false,
+            includeItemTypes: BuiltList<BaseItemKind>(
+                [BaseItemKind.movie, BaseItemKind.series, BaseItemKind.boxSet]),
+            fields: BuiltList<ItemFields>([
+              ItemFields.overview,
+              ItemFields.genres,
+              ItemFields.dateCreated,
+              ItemFields.providerIds,
+            ]),
+          );
+      cache.putLibraryItems(folder.id!, itemsResponse.data!.items!.toList());
+
+      if (folder.collectionType == CollectionType.tvshows) {
+        final episodesResponse = await _jellyfinApi!.getItemsApi().getItems(
+              userId: _user!.id!,
+              headers: headers,
+              parentId: folder.id,
+              recursive: true,
+              enableTotalRecordCount: false,
+              includeItemTypes:
+                  BuiltList<BaseItemKind>([BaseItemKind.episode]),
+              fields: BuiltList<ItemFields>([ItemFields.overview]),
+            );
+        final Map<String, List<BaseItemDto>> bySeries = {};
+        for (var e in episodesResponse.data!.items!) {
+          if (e.seriesId == null) continue;
+          bySeries.putIfAbsent(e.seriesId!, () => []).add(e);
+        }
+        bySeries.forEach((seriesId, episodes) {
+          episodes.sort((a, b) {
+            final season = (a.parentIndexNumber ?? 0)
+                .compareTo(b.parentIndexNumber ?? 0);
+            return season != 0
+                ? season
+                : (a.indexNumber ?? 0).compareTo(b.indexNumber ?? 0);
+          });
+          cache.putEpisodes(seriesId, episodes);
+        });
+      }
+    }
+    cache.syncedAt = DateTime.now();
+    await cache.save();
+    _logger.verbose("OfflineCache: library synced");
+  }
 
   ApiService({required logger}) {
     _logger = logger;
@@ -178,12 +287,18 @@ class ApiService {
   }
 
   Future<BaseItemDto> getItemDetails(String id) async {
-    var response = await _jellyfinApi!.getUserLibraryApi().getItem(
-          userId: _user!.id!,
-          itemId: id,
-          headers: headers,
-        );
-    return response.data!;
+    return _withOfflineCache(
+      online: () async {
+        var response = await _jellyfinApi!.getUserLibraryApi().getItem(
+              userId: _user!.id!,
+              itemId: id,
+              headers: headers,
+            );
+        return response.data!;
+      },
+      cached: (cache) => cache.getItem(id),
+      store: (cache, item) => cache.putItem(item),
+    );
   }
 
   String getImageUrl(String id, ImageType type) {
@@ -191,6 +306,7 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> getContinueWatching({String? parentId}) async {
+    if (offline) return [];
     var response = await _jellyfinApi!.getItemsApi().getResumeItems(
         userId: _user!.id!,
         parentId: parentId,
@@ -201,6 +317,7 @@ class ApiService {
 
   Future<List<BaseItemDto>> getLatestItems(CollectionType collectionType,
       {int? limit}) async {
+    if (offline) return [];
     List<BaseItemDto> items = [];
     var folders = await getMediaFolders();
     // get all movie collections and their ids
@@ -232,25 +349,40 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> getMediaFolders() async {
-    var response = await _jellyfinApi!
-        .getUserViewsApi()
-        .getUserViews(userId: _user!.id!, headers: headers);
-    // keep only video folders
-    var folders = response.data!.items!.where((element) {
-      return element.collectionType == CollectionType.movies ||
-          element.collectionType == CollectionType.tvshows;
-    }).toList();
-    return folders;
-    //return response.data!;
+    return _withOfflineCache(
+      online: () async {
+        var response = await _jellyfinApi!
+            .getUserViewsApi()
+            .getUserViews(userId: _user!.id!, headers: headers);
+        // keep only video folders
+        var folders = response.data!.items!.where((element) {
+          return element.collectionType == CollectionType.movies ||
+              element.collectionType == CollectionType.tvshows;
+        }).toList();
+        return folders;
+      },
+      cached: (cache) => cache.getFolders(),
+      store: (cache, folders) => cache.putFolders(folders),
+    );
   }
 
   Future<List<BaseItemDto>> getEpisodes(String id) async {
-    var response = await _jellyfinApi!.getTvShowsApi().getEpisodes(
-        userId: _user!.id!,
-        seriesId: id,
-        headers: headers,
-        fields: [ItemFields.mediaSources].toBuiltList());
-    return response.data!.items!.toList();
+    return _withOfflineCache(
+      online: () async {
+        var response = await _jellyfinApi!.getTvShowsApi().getEpisodes(
+            userId: _user!.id!,
+            seriesId: id,
+            headers: headers,
+            fields: [ItemFields.mediaSources, ItemFields.overview]
+                .toBuiltList());
+        return response.data!.items!.toList();
+      },
+      cached: (cache) {
+        final episodes = cache.getEpisodes(id);
+        return episodes.isEmpty ? null : episodes;
+      },
+      store: (cache, episodes) => cache.putEpisodes(id, episodes),
+    );
   }
 
   Future<List<BaseItemDto>> getFilterItems({
@@ -269,6 +401,37 @@ class ApiService {
     var ids = genreIds == null
         ? null
         : BuiltList<String>.from(genreIds.map((e) => e.id!));
+    final itemTypes = includeItemTypes ??
+        [
+          BaseItemKind.movie,
+          BaseItemKind.series,
+          BaseItemKind.episode,
+          BaseItemKind.boxSet
+        ];
+    List<BaseItemDto> fromCache() {
+      final cache = offlineCache;
+      if (cache == null) return [];
+      return cache.queryItems(
+        parentId: parentId,
+        includeItemTypes: itemTypes,
+        genreIds: ids?.toList(),
+        searchTerm: searchTerm,
+        filters: [
+          ...?filters,
+          if (isPlayed == true) ItemFilter.isPlayed,
+          if (isPlayed == false) ItemFilter.isUnplayed,
+        ],
+        sortBy: sortBy?.firstOrNull,
+        sortOrder: sortOrder?.firstOrNull,
+        startIndex: startIndex,
+        limit: limit,
+      );
+    }
+
+    if (offline) {
+      await offlineCache?.ensureLoaded();
+      return fromCache();
+    }
     try {
       var response = await _jellyfinApi!.getItemsApi().getItems(
             userId: _user!.id!,
@@ -304,14 +467,24 @@ class ApiService {
             ),
           );
 
-      return response.data!.items!.toList();
+      final items = response.data!.items!.toList();
+      await offlineCache?.ensureLoaded();
+      offlineCache?.putItems(items);
+      return items;
     } catch (e) {
-      return [];
+      await offlineCache?.ensureLoaded();
+      return fromCache();
     }
   }
 
   Future<List<BaseItemDto>> getGenres(
       {List<BaseItemKind>? includeItemTypes}) async {
+    if (offline) {
+      final cache = offlineCache;
+      if (cache == null) return [];
+      await cache.ensureLoaded();
+      return cache.genres(includeItemTypes: includeItemTypes);
+    }
     var response = await _jellyfinApi!.getGenresApi().getGenres(
           userId: _user!.id!,
           headers: headers,
@@ -493,6 +666,7 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> getTopTenPopular() async {
+    if (offline) return [];
     // TODO cache to increase performance
     // get locale
     Locale locale = Localizations.localeOf(navigatorKey.currentContext!);
@@ -623,6 +797,7 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> getNextUpEpisode({String? seriesId}) async {
+    if (offline) return [];
     try {
       Response<BaseItemDtoQueryResult> response = await _jellyfinApi!
           .getTvShowsApi()
@@ -651,6 +826,7 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> similarItems(String itemId, {int? limit}) async {
+    if (offline) return [];
     var similarItems = await _jellyfinApi!.getLibraryApi().getSimilarItems(
           headers: headers,
           userId: _user!.id!,
@@ -732,6 +908,7 @@ class ApiService {
   }
 
   Future<List<BaseItemDto>> getWatchlist() async {
+    if (offline) return [];
     String watchlistId = await getWatchlistId();
 
     var watchlist = await getPlaylistItems(watchlistId);
@@ -763,6 +940,7 @@ class ApiService {
   }
 
   Future<List<RecommendationDto>> getRecommendations() async {
+    if (offline) return [];
     //! api only exists for movies
     var folders = await getMediaFolders();
 

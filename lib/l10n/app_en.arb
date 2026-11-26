@@ -206,5 +206,71 @@
     "mpvConfigTitle": "MPV Configuration",
     "mpvConfigResetConfirm": "Reset MPV configuration to default?",
     "mpvConfigResetDescription": "This will restore the default MPV configuration settings.",
-    "goBack": "Go Back"
+    "goBack": "Go Back",
+    "downloadsSummary": "{count} items · {size}",
+    "@downloadsSummary": {
+        "placeholders": {
+            "count": {"type": "int"},
+            "size": {"type": "String"}
+        }
+    },
+    "shows": "Shows",
+    "movies": "Movies",
+    "seasonNumber": "Season {number}",
+    "@seasonNumber": {
+        "placeholders": {
+            "number": {"type": "int"}
+        }
+    },
+    "episodeNumber": "Episode {number}",
+    "@episodeNumber": {
+        "placeholders": {
+            "number": {"type": "int"}
+        }
+    },
+    "episodeCount": "{count, plural, =1{1 episode} other{{count} episodes}}",
+    "@episodeCount": {
+        "placeholders": {
+            "count": {"type": "num"}
+        }
+    },
+    "downloadStatusDownloading": "Downloading {progress}%",
+    "@downloadStatusDownloading": {
+        "placeholders": {
+            "progress": {"type": "int"}
+        }
+    },
+    "downloadStatusPaused": "Paused at {progress}%",
+    "@downloadStatusPaused": {
+        "placeholders": {
+            "progress": {"type": "int"}
+        }
+    },
+    "downloadStatusFailed": "Failed at {progress}%. Tap ⋮ to resume.",
+    "@downloadStatusFailed": {
+        "placeholders": {
+            "progress": {"type": "int"}
+        }
+    },
+    "downloadStatusWaiting": "Waiting to start",
+    "stillDownloading": "This is still downloading.",
+    "notDownloaded": "Not downloaded",
+    "notAvailableOffline": "This isn't downloaded, so it can't be played offline.",
+    "resumeAllDownloads": "Resume all",
+    "resumedDownloadsCount": "Resumed {count} downloads",
+    "@resumedDownloadsCount": {
+        "placeholders": {
+            "count": {"type": "int"}
+        }
+    },
+    "deleteShowDownloads": "Delete all downloads for this show",
+    "specials": "Specials",
+    "offlineLibraryNotice": "You're offline. Only downloaded items can be played.",
+    "downloadSeason": "Download season",
+    "downloadingSeason": "Downloading {count} episodes",
+    "@downloadingSeason": {
+        "placeholders": {
+            "count": {"type": "int"}
+        }
+    }
 }

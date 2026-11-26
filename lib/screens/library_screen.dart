@@ -11,6 +11,8 @@ import 'package:jellyflix/models/screen_paths.dart';
 import 'package:jellyflix/models/skeleton_item.dart';
 import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/components/filter_button.dart';
+import 'package:jellyflix/components/offline_dimmed.dart';
+import 'package:jellyflix/providers/offline_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
@@ -103,7 +105,20 @@ class LibraryScreen extends HookConsumerWidget {
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(10.0),
             ),
-            child: Text(AppLocalizations.of(context)!.library),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(AppLocalizations.of(context)!.library),
+                if (ref.watch(isOfflineProvider)) ...[
+                  const SizedBox(width: 10),
+                  Tooltip(
+                    message: AppLocalizations.of(context)!.offlineLibraryNotice,
+                    triggerMode: TooltipTriggerMode.tap,
+                    child: const Icon(Icons.cloud_off_rounded, size: 20),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
         bottom: PreferredSize(
@@ -322,44 +337,47 @@ class LibraryScreen extends HookConsumerWidget {
                                     mainAxisSpacing: layout.tilePadding),
                             itemCount: itemsList.length,
                             itemBuilder: (context, index) {
-                              return Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  JfxTile(
-                                      id: itemsList[index].id!,
-                                      onTap: () {
-                                        context.pushNamed(
-                                            ScreenPaths.library +
-                                                ScreenPaths.detail,
-                                            queryParameters: {
-                                              "id": itemsList[index].id!,
-                                            });
-                                      },
-                                      blurHash: itemsList[index]
-                                          .imageBlurHashes
-                                          ?.primary
-                                          ?.values
-                                          .first),
-                                  const SizedBox(height: 5.0),
-                                  Flexible(
-                                    child: Text(
-                                      itemsList[index].name!,
-                                      style: layout.text.bodyMedium,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                              return OfflineDimmed(
+                                item: itemsList[index],
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    JfxTile(
+                                        id: itemsList[index].id!,
+                                        onTap: () {
+                                          context.pushNamed(
+                                              ScreenPaths.library +
+                                                  ScreenPaths.detail,
+                                              queryParameters: {
+                                                "id": itemsList[index].id!,
+                                              });
+                                        },
+                                        blurHash: itemsList[index]
+                                            .imageBlurHashes
+                                            ?.primary
+                                            ?.values
+                                            .first),
+                                    const SizedBox(height: 5.0),
+                                    Flexible(
+                                      child: Text(
+                                        itemsList[index].name!,
+                                        style: layout.text.bodyMedium,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                  Flexible(
-                                    child: Text(
-                                      itemsList[index]
-                                          .productionYear
-                                          .toString(),
-                                      style: layout.text.bodyMedium,
+                                    Flexible(
+                                      child: Text(
+                                        itemsList[index]
+                                            .productionYear
+                                            .toString(),
+                                        style: layout.text.bodyMedium,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               );
                             },
                           ),

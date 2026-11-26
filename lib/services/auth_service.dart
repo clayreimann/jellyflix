@@ -185,6 +185,16 @@ class AuthService {
     return profiles;
   }
 
+  /// Loads the current profile into the API service without contacting the
+  /// server, for browsing the offline library cache.
+  Future<void> restoreOfflineSession() async {
+    final profileId = currentProfileid();
+    if (profileId == null) return;
+    User? user = _databaseService.get(profileId);
+    if (user == null || user.serverAdress == null) return;
+    await _apiService.registerAccessToken(user);
+  }
+
   Future<bool?> checkServerReachable({String? profileId}) async {
     // get latest element from the stream
     profileId ??= currentProfileid();

@@ -7,6 +7,7 @@ import 'package:jellyflix/components/jfx_layout.dart';
 import 'package:jellyflix/components/rounded_download_button.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:jellyflix/providers/api_provider.dart';
+import 'package:jellyflix/providers/offline_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class JfxButtonRow extends StatelessWidget {
@@ -21,6 +22,10 @@ class JfxButtonRow extends StatelessWidget {
   final StreamController<List<BaseItemDto>> streamController;
   final Function goToPlayerScreen;
 
+  /// Plays a downloaded item: (ref, itemId, context, title).
+  final Future<void> Function(WidgetRef, String, BuildContext, String)?
+      goToOfflinePlayer;
+
   const JfxButtonRow(
       {Key? key,
       required this.context,
@@ -32,7 +37,8 @@ class JfxButtonRow extends StatelessWidget {
       required this.onWatchlist,
       required this.markedAsPlayed,
       required this.streamController,
-      required this.goToPlayerScreen})
+      required this.goToPlayerScreen,
+      this.goToOfflinePlayer})
       : super(key: key);
 
   @override
@@ -114,6 +120,45 @@ class JfxButtonRow extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onPrimary,
                 ),
                 AppLocalizations.of(context)!.play),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            iconColor: Theme.of(context).colorScheme.onPrimary,
+          ));
+    }
+
+    Widget buildOfflinePlayButton(BuildContext context, WidgetRef ref,
+        BaseItemDto data, JfxLayout layout) {
+      final availability = ref.watch(offlineAvailabilityProvider).value;
+      String? playId;
+      String title = data.name ?? "";
+      if (availability != null) {
+        if (data.type == BaseItemKind.series) {
+          final episodes = availability.episodesOf(data.id!);
+          if (episodes.isNotEmpty) {
+            playId = episodes.first.id;
+            title = episodes.first.name;
+          }
+        } else if (availability.isAvailable(data)) {
+          playId = data.id;
+        }
+      }
+      final available = playId != null && goToOfflinePlayer != null;
+      return ElevatedButton.icon(
+          onPressed: available
+              ? () => goToOfflinePlayer!(ref, playId!, context, title)
+              : null,
+          icon: Icon(available
+              ? Icons.play_arrow_rounded
+              : Icons.cloud_off_rounded),
+          label: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+                available
+                    ? AppLocalizations.of(context)!.play
+                    : AppLocalizations.of(context)!.notDownloaded,
+                style: layout.text.bodyLarge),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primary,
@@ -315,6 +360,10 @@ class JfxButtonRow extends StatelessWidget {
           ),
         ),
       );
+    }
+
+    if (ref.read(isOfflineProvider)) {
+      return Row(children: [buildOfflinePlayButton(context, ref, data, layout)]);
     }
 
     return Row(
