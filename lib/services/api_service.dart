@@ -1055,7 +1055,12 @@ class ApiService {
             "${user!.serverAdress!}/System/Ping",
           )
           .timeout(const Duration(seconds: 2));
-      if (result.statusCode == 200) {
+      // A captive portal (hotel/plane Wi-Fi) answers with a 200 HTML page;
+      // that isn't the server.
+      final body = result.data;
+      final looksLikeHtml =
+          body is String && body.trimLeft().startsWith("<");
+      if (result.statusCode == 200 && !looksLikeHtml) {
         return true;
       } else {
         return false;
