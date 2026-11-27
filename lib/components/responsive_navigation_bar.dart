@@ -1,4 +1,6 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,6 +23,19 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
             ? 2
             : 0);
     final JfxLayout layout = JfxLayout.scalingLayout(context);
+
+    // Phone-width tab bar (Material on Android, Cupertino on iOS).
+    Future<void> onTabTapped(int index) async {
+      bool online = await showOfflineSnackbar(
+          context, ref.read(authStateProvider.notifier).state);
+      if (online || index == 2 || index == 4) {
+        selectedIndex.value = index;
+      }
+      navigationShell.goBranch(
+        index,
+        initialLocation: index == navigationShell.currentIndex,
+      );
+    }
 
     return Scaffold(
       body: Row(
@@ -213,45 +228,69 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
           Expanded(child: navigationShell),
         ],
       ),
-      bottomNavigationBar: MediaQuery.of(context).size.width < 640
-          ? BottomNavigationBar(
-              currentIndex: selectedIndex.value,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.black26,
-              unselectedItemColor: Colors.grey,
-              selectedItemColor: Theme.of(context).colorScheme.primary,
-              showUnselectedLabels: false,
-              // called when one tab is selected
-              onTap: (int index) async {
-                bool online = await showOfflineSnackbar(
-                    context, ref.read(authStateProvider.notifier).state);
-                if (online || index == 2 || index == 4) {
-                  selectedIndex.value = index;
-                }
-                navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
-                );
-              },
-              // bottom tab items
-              items: [
-                  BottomNavigationBarItem(
-                      icon: const Icon(Icons.home_rounded),
-                      label: AppLocalizations.of(context)!.home),
-                  BottomNavigationBarItem(
-                      icon: const Icon(Icons.search_rounded),
-                      label: AppLocalizations.of(context)!.search),
-                  BottomNavigationBarItem(
-                      icon: const Icon(Icons.file_download_outlined),
-                      label: AppLocalizations.of(context)!.downloads),
-                  BottomNavigationBarItem(
-                      icon: const Icon(Icons.video_library_outlined),
-                      label: AppLocalizations.of(context)!.library),
-                  BottomNavigationBarItem(
-                      icon: const Icon(Icons.person_rounded),
-                      label: AppLocalizations.of(context)!.profile)
-                ])
-          : null,
+      bottomNavigationBar: MediaQuery.of(context).size.width >= 640
+          ? null
+          : isCupertino(context)
+              ? _cupertinoTabBar(context, selectedIndex.value, onTabTapped)
+              : BottomNavigationBar(
+                  currentIndex: selectedIndex.value,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.black26,
+                  unselectedItemColor: Colors.grey,
+                  selectedItemColor: Theme.of(context).colorScheme.primary,
+                  showUnselectedLabels: false,
+                  // called when one tab is selected
+                  onTap: onTabTapped,
+                  // bottom tab items
+                  items: [
+                      BottomNavigationBarItem(
+                          icon: const Icon(Icons.home_rounded),
+                          label: AppLocalizations.of(context)!.home),
+                      BottomNavigationBarItem(
+                          icon: const Icon(Icons.search_rounded),
+                          label: AppLocalizations.of(context)!.search),
+                      BottomNavigationBarItem(
+                          icon: const Icon(Icons.file_download_outlined),
+                          label: AppLocalizations.of(context)!.downloads),
+                      BottomNavigationBarItem(
+                          icon: const Icon(Icons.video_library_outlined),
+                          label: AppLocalizations.of(context)!.library),
+                      BottomNavigationBarItem(
+                          icon: const Icon(Icons.person_rounded),
+                          label: AppLocalizations.of(context)!.profile)
+                    ]),
+    );
+  }
+
+  /// The iOS tab bar: SF Symbols-style icons, labels on every tab and the
+  /// app's accent colour for the selected one.
+  Widget _cupertinoTabBar(
+      BuildContext context, int currentIndex, ValueChanged<int> onTap) {
+    final l10n = AppLocalizations.of(context)!;
+    return CupertinoTabBar(
+      currentIndex: currentIndex,
+      onTap: onTap,
+      activeColor: Theme.of(context).colorScheme.primary,
+      items: [
+        BottomNavigationBarItem(
+            icon: const Icon(CupertinoIcons.house),
+            activeIcon: const Icon(CupertinoIcons.house_fill),
+            label: l10n.home),
+        BottomNavigationBarItem(
+            icon: const Icon(CupertinoIcons.search), label: l10n.search),
+        BottomNavigationBarItem(
+            icon: const Icon(CupertinoIcons.arrow_down_circle),
+            activeIcon: const Icon(CupertinoIcons.arrow_down_circle_fill),
+            label: l10n.downloads),
+        BottomNavigationBarItem(
+            icon: const Icon(CupertinoIcons.rectangle_stack),
+            activeIcon: const Icon(CupertinoIcons.rectangle_stack_fill),
+            label: l10n.library),
+        BottomNavigationBarItem(
+            icon: const Icon(CupertinoIcons.person_crop_circle),
+            activeIcon: const Icon(CupertinoIcons.person_crop_circle_fill),
+            label: l10n.profile),
+      ],
     );
   }
 

@@ -79,6 +79,16 @@ class MyApp extends ConsumerWidget {
               primary: const Color(0xFFDBEBC0),
               brightness: Brightness.dark),
           useMaterial3: true,
+          // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
+          // app's accent and iOS's dark bar colours. Android never builds
+          // Cupertino widgets, so this has no effect there.
+          cupertinoOverrideTheme: isCupertinoPlatform
+              ? const CupertinoThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: Color(0xFFDBEBC0),
+                  barBackgroundColor: Color(0xF01D1D1D),
+                )
+              : null,
         ),
       ),
     );
