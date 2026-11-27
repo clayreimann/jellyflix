@@ -170,6 +170,8 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SettingsTile(
               icon: Icons.downloading_rounded,
+              iosIcon: CupertinoIcons.arrow_down_circle_fill,
+              iosColor: CupertinoColors.systemOrange,
               title: Text(AppLocalizations.of(context)!.simultaneousDownloads),
               value: Text(maxConcurrentDownloads.value.toString()),
               opensMore: true,
