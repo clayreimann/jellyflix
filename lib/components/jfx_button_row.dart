@@ -196,7 +196,7 @@ class JfxButtonRow extends StatelessWidget {
         width: 40,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100.0),
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
         ),
         child: ElevatedButton(
           onPressed: () async {
@@ -335,7 +335,10 @@ class JfxButtonRow extends StatelessWidget {
             width: 40,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(100.0),
-              color: Colors.white.withValues(alpha: 0.1),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.1),
             ),
             child: RoundedDownloadButton(itemId: itemId, data: data),
           ),

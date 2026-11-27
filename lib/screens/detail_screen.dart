@@ -197,7 +197,9 @@ class DetailScreen extends HookConsumerWidget {
                                                 borderRadius:
                                                     BorderRadius.circular(10.0),
                                                 border: Border.all(
-                                                  color: Colors.white,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurface,
                                                   width: 0.7,
                                                 )),
                                             child: Padding(

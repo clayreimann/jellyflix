@@ -10,6 +10,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:jellyflix/components/adaptive.dart';
 import 'package:jellyflix/providers/router_provider.dart';
+import 'package:jellyflix/providers/theme_mode_provider.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:jellyflix/providers/scaffold_key.dart';
 import 'package:jellyflix/services/database_service.dart';
 import 'package:jellyflix/widgets/input_detector.dart';
@@ -45,10 +47,6 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appRouter = ref.read(routerProvider).router;
-    final colorScheme = ColorScheme.fromSeed(
-        seedColor: Colors.deepPurple,
-        primary: const Color(0xFFDBEBC0),
-        brightness: Brightness.dark);
     return InputDetector(
       child: MaterialApp.router(
         scaffoldMessengerKey: rootScaffoldMessengerKey,
@@ -65,52 +63,70 @@ class MyApp extends ConsumerWidget {
         // package:flutter/material.dart. Without this bridge they would read
         // that library's default light theme instead of ours. Remove once
         // they have migrated to material_ui.
-        builder: (context, child) =>
-            // ignore: deprecated_member_use
-            MaterialUiCompatibilityBridge(child: child!),
-        title: "Jellyflix",
-        theme: ThemeData(
-          // iOS has no ink ripple: taps only highlight.
-          splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
-          // iOS has no snackbar; show messages as a floating rounded toast
-          // above the tab bar instead of a full-width Material bar.
-          snackBarTheme: isCupertinoPlatform
-              ? SnackBarThemeData(
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: const Color(0xF02C2C2E),
-                  contentTextStyle:
-                      const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15),
-                  actionTextColor: colorScheme.primary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                )
-              : null,
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            },
-          ),
-          colorScheme: colorScheme,
-          useMaterial3: true,
-          // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
-          // app's accent and iOS's dark bar colours. Android never builds
-          // Cupertino widgets, so this has no effect there.
-          cupertinoOverrideTheme: isCupertinoPlatform
-              ? CupertinoThemeData(
-                  brightness: Brightness.dark,
-                  primaryColor: colorScheme.primary,
-                  // The page colour, slightly see-through so the bars blur
-                  // what scrolls under them.
-                  barBackgroundColor:
-                      colorScheme.surface.withValues(alpha: 0.94),
-                  scaffoldBackgroundColor: colorScheme.surface,
-                )
-              : null,
+        builder: (context, child) => SkeletonizerConfig(
+          // Loading placeholders follow the light/dark theme.
+          data: Theme.of(context).brightness == Brightness.dark
+              ? const SkeletonizerConfigData.dark()
+              : const SkeletonizerConfigData(),
+          // ignore: deprecated_member_use
+          child: MaterialUiCompatibilityBridge(child: child!),
         ),
+        title: "Jellyflix",
+        theme: buildAppTheme(Brightness.light),
+        darkTheme: buildAppTheme(Brightness.dark),
+        themeMode: ref.watch(themeModeProvider),
       ),
     );
   }
+}
+
+/// The app theme for [brightness]. Dark keeps the original look (pale green
+/// on a deep purple-tinted surface); light uses a darker green so the accent
+/// reads on white.
+ThemeData buildAppTheme(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final colorScheme = ColorScheme.fromSeed(
+      seedColor: Colors.deepPurple,
+      primary: dark ? const Color(0xFFDBEBC0) : const Color(0xFF4C662B),
+      brightness: brightness);
+  return ThemeData(
+    // iOS has no ink ripple: taps only highlight.
+    splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
+    // iOS has no snackbar; show messages as a floating rounded toast
+    // above the tab bar instead of a full-width Material bar.
+    snackBarTheme: isCupertinoPlatform
+        ? SnackBarThemeData(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xF02C2C2E),
+            contentTextStyle:
+                const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15),
+            actionTextColor: colorScheme.primary,
+            elevation: 0,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          )
+        : null,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
+    colorScheme: colorScheme,
+    useMaterial3: true,
+    // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
+    // app's accent and bar colours. Android never builds
+    // Cupertino widgets, so this has no effect there.
+    cupertinoOverrideTheme: isCupertinoPlatform
+        ? CupertinoThemeData(
+            brightness: brightness,
+            primaryColor: colorScheme.primary,
+            // The page colour, slightly see-through so the bars blur
+            // what scrolls under them.
+            barBackgroundColor: colorScheme.surface.withValues(alpha: 0.94),
+            scaffoldBackgroundColor: colorScheme.surface,
+          )
+        : null,
+  );
 }

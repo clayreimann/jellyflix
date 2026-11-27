@@ -72,7 +72,6 @@ class _FutureItemCarouselState extends ConsumerState<PaginatedItemCarousel> {
       var stubData =
           List.filled(Random().nextInt(7) + 3, SkeletonItem.baseItemDto);
       return Skeletonizer(
-        effect: const ShimmerEffect(),
         enabled: true,
         child: ItemCarousel(
             imageList: stubData.map((e) {
