@@ -206,5 +206,9 @@
     "mpvConfigTitle": "MPV Configuration",
     "mpvConfigResetConfirm": "Reset MPV configuration to default?",
     "mpvConfigResetDescription": "This will restore the default MPV configuration settings.",
-    "goBack": "Go Back"
+    "goBack": "Go Back",
+    "appearance": "Appearance",
+    "appearanceSystem": "System",
+    "appearanceLight": "Light",
+    "appearanceDark": "Dark"
 }

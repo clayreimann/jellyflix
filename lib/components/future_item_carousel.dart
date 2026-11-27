@@ -47,7 +47,6 @@ class FutureItemCarousel extends StatelessWidget {
             }
           }
           return Skeletonizer(
-            effect: const ShimmerEffect(),
             enabled: !snapshot.hasData,
             child: ItemCarousel(
                 imageList: data.map((e) {
