@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter/material.dart';
 
 class LoadingScreen extends StatelessWidget {
@@ -7,7 +8,7 @@ class LoadingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: CircularProgressIndicator(),
+        child: AdaptiveProgressIndicator(),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,8 +37,9 @@ class LoginMessages {
     Widget title, {
     Widget? content,
   }) async {
-    await showDialog(
+    await showAdaptivePlatformDialog(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.enter): () {
@@ -46,14 +48,21 @@ class LoginMessages {
         },
         child: FocusScope(
           autofocus: true,
-          child: AlertDialog(
+          child: AdaptiveAlertDialog(
             title: title,
             content: content,
             actions: [
-              ElevatedButton(
+              AdaptiveDialogAction(
+                isDefaultAction: true,
                 onPressed: () {
                   Navigator.pop(context);
                 },
+                materialButton: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Ok'),
+                ),
                 child: const Text('Ok'),
               )
             ],
