@@ -18,7 +18,7 @@ class LoginScreen extends HookConsumerWidget {
     final loadingListenable = useValueNotifier<bool>(false);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: adaptiveAppBar(context),
       body: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.enter): () async {
