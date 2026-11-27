@@ -80,7 +80,7 @@ class MyApp extends ConsumerWidget {
                   backgroundColor: const Color(0xF02C2C2E),
                   contentTextStyle:
                       const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15),
-                  actionTextColor: const Color(0xFFDBEBC0),
+                  actionTextColor: colorScheme.primary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
