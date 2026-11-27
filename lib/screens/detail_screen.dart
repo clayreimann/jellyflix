@@ -67,25 +67,28 @@ class DetailScreen extends HookConsumerWidget {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: appBarColorTransaparent.value
-          ? AppBar(
-              backgroundColor: Colors.transparent,
-            )
-          : PreferredSize(
-              preferredSize: const Size(
-                double.infinity,
-                56.0,
-              ),
-              child: ClipRRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: AppBar(
-                    elevation: 0.0,
-                    backgroundColor: Colors.black.withValues(alpha: 0.2),
+      appBar: isCupertino(context)
+          // iOS: see-through over the artwork, blurred bar once scrolled.
+          ? adaptiveAppBar(context, transparent: appBarColorTransaparent.value)
+          : appBarColorTransaparent.value
+              ? AppBar(
+                  backgroundColor: Colors.transparent,
+                )
+              : PreferredSize(
+                  preferredSize: const Size(
+                    double.infinity,
+                    56.0,
+                  ),
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                      child: AppBar(
+                        elevation: 0.0,
+                        backgroundColor: Colors.black.withValues(alpha: 0.2),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
       body: FutureBuilder(
           future: ref.read(apiProvider).getItemDetails(itemId),
           builder: (context, AsyncSnapshot<BaseItemDto> snapshot) {

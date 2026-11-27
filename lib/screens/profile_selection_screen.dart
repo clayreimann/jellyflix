@@ -17,7 +17,8 @@ class ProfileSelectionScreen extends HookConsumerWidget {
     final allProfiles = ref.watch(allProfilesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context)!.selectProfile)),
+      appBar: adaptiveAppBar(context,
+          title: Text(AppLocalizations.of(context)!.selectProfile)),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 30.0),
         child: allProfiles.when(

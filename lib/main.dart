@@ -45,6 +45,10 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appRouter = ref.read(routerProvider).router;
+    final colorScheme = ColorScheme.fromSeed(
+        seedColor: Colors.deepPurple,
+        primary: const Color(0xFFDBEBC0),
+        brightness: Brightness.dark);
     return InputDetector(
       child: MaterialApp.router(
         scaffoldMessengerKey: rootScaffoldMessengerKey,
@@ -74,19 +78,20 @@ class MyApp extends ConsumerWidget {
               TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
             },
           ),
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              primary: const Color(0xFFDBEBC0),
-              brightness: Brightness.dark),
+          colorScheme: colorScheme,
           useMaterial3: true,
           // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
           // app's accent and iOS's dark bar colours. Android never builds
           // Cupertino widgets, so this has no effect there.
           cupertinoOverrideTheme: isCupertinoPlatform
-              ? const CupertinoThemeData(
+              ? CupertinoThemeData(
                   brightness: Brightness.dark,
-                  primaryColor: Color(0xFFDBEBC0),
-                  barBackgroundColor: Color(0xF01D1D1D),
+                  primaryColor: colorScheme.primary,
+                  // The page colour, slightly see-through so the bars blur
+                  // what scrolls under them.
+                  barBackgroundColor:
+                      colorScheme.surface.withValues(alpha: 0.94),
+                  scaffoldBackgroundColor: colorScheme.surface,
                 )
               : null,
         ),

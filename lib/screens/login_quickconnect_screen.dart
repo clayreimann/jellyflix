@@ -48,7 +48,7 @@ class LoginQuickConnectScreen extends HookConsumerWidget {
     }, [serverAddress]);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: adaptiveAppBar(context),
       body: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.enter): () async {}
