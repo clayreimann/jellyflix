@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -298,16 +299,18 @@ class ProfileScreen extends HookConsumerWidget {
                                   .read(databaseProvider("settings"))
                                   .put("disableImageCaching", value);
 
-                              showDialog(
+                              showAdaptivePlatformDialog(
                                 context: context,
+                                barrierDismissible: true,
                                 builder: (context) {
-                                  return AlertDialog(
+                                  return AdaptiveAlertDialog(
                                     title: Text(AppLocalizations.of(context)!
                                         .restartApp),
                                     content: Text(AppLocalizations.of(context)!
                                         .restartAppDescription),
                                     actions: [
-                                      TextButton(
+                                      AdaptiveDialogAction(
+                                        isDefaultAction: true,
                                         onPressed: () {
                                           Navigator.pop(context);
                                         },
@@ -331,17 +334,19 @@ class ProfileScreen extends HookConsumerWidget {
                                   .read(databaseProvider("settings"))
                                   .put("disableWatchlist", value);
 
-                              showDialog(
+                              showAdaptivePlatformDialog(
                                 context: context,
+                                barrierDismissible: true,
                                 builder: (context) {
-                                  return AlertDialog(
+                                  return AdaptiveAlertDialog(
                                     title: Text(
                                       AppLocalizations.of(context)!.info,
                                     ),
                                     content: Text(AppLocalizations.of(context)!
                                         .deletePlaylistNotice),
                                     actions: [
-                                      TextButton(
+                                      AdaptiveDialogAction(
+                                        isDefaultAction: true,
                                         onPressed: () {
                                           Navigator.pop(context);
                                         },

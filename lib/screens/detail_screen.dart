@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -406,7 +407,7 @@ class DetailScreen extends HookConsumerWidget {
               );
             } else {
               return const Center(
-                child: CircularProgressIndicator(),
+                child: AdaptiveProgressIndicator(),
               );
             }
           }),

@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -96,7 +97,7 @@ class LoginPasswordScreen extends HookConsumerWidget {
                                   builder: (context, isLoading, _) {
                                     return isLoading
                                         ? const Center(
-                                            child: CircularProgressIndicator())
+                                            child: AdaptiveProgressIndicator())
                                         : FilledButton(
                                             onPressed: () async => await login(
                                               context,
