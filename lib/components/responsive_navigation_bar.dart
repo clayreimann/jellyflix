@@ -1,6 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/components/adaptive.dart';
+import 'package:uikit_tab_bar/uikit_tab_bar.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -46,12 +47,47 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
     // or drawer on wide screens.
     final ios = isCupertino(context);
 
+    if (ios) {
+      // UIKit's own UITabBarController bar (Liquid Glass on iOS 26+),
+      // embedded as a platform view; on older iOS the package draws a
+      // CupertinoTabBar. It stays at every width, including landscape.
+      return UIKitTabScaffold(
+        tabBar: _uikitTabBar(context, selectedIndex.value, onTabTapped),
+        body: Builder(builder: (context) {
+          // The bar floats over the body and reports its height as the
+          // body's bottom padding. Keep the pages above it (lists here
+          // don't all pad themselves), and give snackbars a Scaffold that
+          // ends at the bar so they float just above it.
+          final bottom = MediaQuery.paddingOf(context).bottom;
+          return ColoredBox(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: bottom),
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: Scaffold(
+                  body: SafeArea(
+                    // In landscape the notch or Dynamic Island sits on one
+                    // side; keep every page's content clear of it.
+                    top: false,
+                    bottom: false,
+                    child: navigationShell,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      );
+    }
+
     return Scaffold(
       body: Row(
         mainAxisSize: MainAxisSize.max,
         children: [
           // Show the navigaiton rail if screen width >= 640
-          if (!ios && width >= 640 && width < 1100)
+          if (width >= 640 && width < 1100)
             Container(
               decoration: BoxDecoration(
                   // add elevation
@@ -139,7 +175,7 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
               ),
             ),
 
-          if (!ios && width >= 1100)
+          if (width >= 1100)
             Container(
               decoration: BoxDecoration(
                   // add elevation
@@ -232,81 +268,74 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
           // Main content
           // This part is always shown
           // You will see it on both small and wide screen
-          Expanded(
-            child: ios
-                // In landscape the notch or Dynamic Island sits on one side.
-                // Keep every page's content clear of it (lists don't do
-                // this on their own). The bars handle top and bottom.
-                ? SafeArea(top: false, bottom: false, child: navigationShell)
-                : navigationShell,
-          ),
+          Expanded(child: navigationShell),
         ],
       ),
-      bottomNavigationBar: ios
-          ? _cupertinoTabBar(context, selectedIndex.value, onTabTapped)
-          : width >= 640
-              ? null
-              : BottomNavigationBar(
-                  currentIndex: selectedIndex.value,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.black26,
-                  unselectedItemColor: Colors.grey,
-                  selectedItemColor: Theme.of(context).colorScheme.primary,
-                  showUnselectedLabels: false,
-                  // called when one tab is selected
-                  onTap: onTabTapped,
-                  // bottom tab items
-                  items: [
-                      BottomNavigationBarItem(
-                          icon: const Icon(Icons.home_rounded),
-                          label: AppLocalizations.of(context)!.home),
-                      BottomNavigationBarItem(
-                          icon: const Icon(Icons.search_rounded),
-                          label: AppLocalizations.of(context)!.search),
-                      BottomNavigationBarItem(
-                          icon: const Icon(Icons.file_download_outlined),
-                          label: AppLocalizations.of(context)!.downloads),
-                      BottomNavigationBarItem(
-                          icon: const Icon(Icons.video_library_outlined),
-                          label: AppLocalizations.of(context)!.library),
-                      BottomNavigationBarItem(
-                          icon: const Icon(Icons.person_rounded),
-                          label: AppLocalizations.of(context)!.profile)
-                    ]),
+      bottomNavigationBar: width >= 640
+          ? null
+          : BottomNavigationBar(
+              currentIndex: selectedIndex.value,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.black26,
+              unselectedItemColor: Colors.grey,
+              selectedItemColor: Theme.of(context).colorScheme.primary,
+              showUnselectedLabels: false,
+              // called when one tab is selected
+              onTap: onTabTapped,
+              // bottom tab items
+              items: [
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.home_rounded),
+                      label: AppLocalizations.of(context)!.home),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.search_rounded),
+                      label: AppLocalizations.of(context)!.search),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.file_download_outlined),
+                      label: AppLocalizations.of(context)!.downloads),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.video_library_outlined),
+                      label: AppLocalizations.of(context)!.library),
+                  BottomNavigationBarItem(
+                      icon: const Icon(Icons.person_rounded),
+                      label: AppLocalizations.of(context)!.profile)
+                ]),
     );
   }
 
   /// The iOS tab bar: SF Symbols-style icons, labels on every tab and the
   /// app's accent colour for the selected one.
-  Widget _cupertinoTabBar(
+  Widget _uikitTabBar(
       BuildContext context, int currentIndex, ValueChanged<int> onTap) {
     final l10n = AppLocalizations.of(context)!;
-    // Flutter's own iOS tab bar, in the system's bar material: the
-    // translucent grey-white (or near-black) chrome with a hairline on top,
-    // blurred over the content, rather than the app's tinted surface.
-    // Filled glyphs for every tab; only the tint marks the selected one.
-    return CupertinoTabBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      activeColor: Theme.of(context).colorScheme.primary,
-      inactiveColor: CupertinoColors.systemGrey,
-      backgroundColor: iosChromeColor,
-      iconSize: 26,
-      items: [
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.house_fill), label: l10n.home),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.search), label: l10n.search),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.arrow_down_to_line),
-            label: l10n.downloads),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.rectangle_stack_fill),
-            label: l10n.library),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.person_crop_circle_fill),
-            label: l10n.profile),
+    UIKitTab tab(int index, String label, String symbol, IconData fallback,
+            {bool fill = true}) =>
+        UIKitTab(
+          id: '$index',
+          label: label,
+          // SF Symbols, as the system apps use; the filled variant marks
+          // the selected tab (iOS 26.1+).
+          icon: UIKitTabIcon.symbol(symbol),
+          selectedIcon: fill ? UIKitTabIcon.symbol('$symbol.fill') : null,
+          fallbackIcon: Icon(fallback),
+        );
+    return UIKitTabBar(
+      tabs: [
+        tab(0, l10n.home, 'house', CupertinoIcons.house_fill),
+        tab(1, l10n.search, 'magnifyingglass', CupertinoIcons.search,
+            fill: false),
+        tab(2, l10n.downloads, 'arrow.down.circle',
+            CupertinoIcons.arrow_down_circle),
+        tab(3, l10n.library, 'rectangle.stack',
+            CupertinoIcons.rectangle_stack_fill),
+        tab(4, l10n.profile, 'person.crop.circle',
+            CupertinoIcons.person_crop_circle_fill),
       ],
+      selectedId: '$currentIndex',
+      onSelected: (id) => onTap(int.parse(id)),
+      // Tapping the current tab goes back to its first page.
+      onReselect: (id) => onTap(int.parse(id)),
+      style: UIKitTabBarStyle(tintColor: Theme.of(context).colorScheme.primary),
     );
   }
 

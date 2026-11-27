@@ -7,6 +7,7 @@ import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:jellyflix/models/auth_state.dart';
 import 'package:jellyflix/providers/auth_provider.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:uikit_tab_bar/uikit_tab_bar.dart';
 
 Widget _app(TargetPlatform platform) {
   final router = GoRouter(initialLocation: '/0', routes: [
@@ -41,14 +42,13 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(TargetPlatform.iOS));
     await tester.pumpAndSettle();
-    expect(find.byType(CupertinoTabBar), findsOneWidget);
+    expect(find.byType(UIKitTabBar), findsOneWidget);
     expect(find.byType(BottomNavigationBar), findsNothing);
-    expect(tester.getSize(find.byType(CupertinoTabBar)).height, 50.0 + 0);
 
     await tester.tap(find.byIcon(CupertinoIcons.search));
     await tester.pumpAndSettle();
     expect(find.text('tab 1'), findsOneWidget);
-    // Same glyph when not selected; only the tint changes.
+    // Fallback glyphs off iOS 26 (the native bar uses SF Symbols).
     expect(find.byIcon(CupertinoIcons.house_fill), findsOneWidget);
   });
 
@@ -58,7 +58,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(TargetPlatform.iOS));
     await tester.pumpAndSettle();
-    expect(find.byType(CupertinoTabBar), findsOneWidget);
+    expect(find.byType(UIKitTabBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
   });
 
@@ -70,7 +70,7 @@ void main() {
       await tester.pumpWidget(_app(platform));
       await tester.pumpAndSettle();
       expect(find.byType(BottomNavigationBar), findsOneWidget);
-      expect(find.byType(CupertinoTabBar), findsNothing);
+      expect(find.byType(UIKitTabBar), findsNothing);
     });
   }
 }
