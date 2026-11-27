@@ -48,10 +48,21 @@ class DetailScreen extends HookConsumerWidget {
 
     final layout = JfxLayout.scalingLayout(context);
     final featuredPosterHeight = layout.tileHeight * 1.3;
-    // iOS: the bar turns solid and shows the title only once the header
-    // (poster and name) has scrolled up under it, like the TV and Music
-    // apps, rather than at the first pixel.
-    final barThreshold = ios ? featuredPosterHeight * 0.75 : 0.0;
+
+    // iOS: room for the nav bar above the poster, plus a little air, so
+    // the poster sits fully below the bar. The artwork and its gradient
+    // still run up behind the bar to the top of the screen.
+    final barBottom =
+        MediaQuery.of(context).padding.top + kMinInteractiveDimensionCupertino;
+    final headerTop = ios ? barBottom + 12 : MediaQuery.of(context).padding.top;
+    final headerHeight = featuredPosterHeight + headerTop;
+
+    // iOS: how far the bar has turned solid, 0 to 1. It fades in over the
+    // last stretch of the header, when what's under the bar is almost all
+    // page colour, instead of switching at once over the artwork.
+    final barFadeEnd = headerHeight - barBottom;
+    final barFadeStart = barFadeEnd - 56;
+    final barProgress = useValueNotifier(0.0);
 
     // Load once per item. Building the future inline refetched the item
     // (and its episodes) on every rebuild, including each time the bar
@@ -61,15 +72,21 @@ class DetailScreen extends HookConsumerWidget {
 
     useEffect(() {
       listener() {
-        appBarColorTransaparent.value =
-            scrollController.position.pixels <= barThreshold;
+        final pixels = scrollController.position.pixels;
+        if (ios) {
+          barProgress.value =
+              ((pixels - barFadeStart) / (barFadeEnd - barFadeStart))
+                  .clamp(0.0, 1.0);
+        } else {
+          appBarColorTransaparent.value = pixels <= 0;
+        }
       }
 
       scrollController.addListener(listener);
       return () {
         return scrollController.removeListener(listener);
       };
-    }, [scrollController]);
+    }, [scrollController, barFadeStart, barFadeEnd]);
 
     useEffect(() {
       ref.read(apiProvider).getWatchlist().then((value) {
@@ -79,16 +96,19 @@ class DetailScreen extends HookConsumerWidget {
       return null;
     }, [itemId]);
 
-    // iOS: room for the nav bar above the poster, so the back button
-    // doesn't sit on top of it.
-    final headerTop = MediaQuery.of(context).padding.top +
-        (ios ? kMinInteractiveDimensionCupertino : 0);
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: ios
-          ? _iosBar(context,
-              transparent: appBarColorTransaparent.value, title: title)
+          ? PreferredSize(
+              preferredSize:
+                  const Size.fromHeight(kMinInteractiveDimensionCupertino),
+              // Rebuilds only the bar on scroll, not the page.
+              child: ValueListenableBuilder<double>(
+                valueListenable: barProgress,
+                builder: (context, progress, _) =>
+                    _iosBar(context, progress: progress, title: title),
+              ),
+            )
           : appBarColorTransaparent.value
               ? AppBar(
                   backgroundColor: Colors.transparent,
@@ -144,7 +164,7 @@ class DetailScreen extends HookConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
-                        height: featuredPosterHeight + headerTop,
+                        height: headerHeight,
                         child: Stack(
                           children: [
                             Stack(
@@ -435,42 +455,44 @@ class DetailScreen extends HookConsumerWidget {
     );
   }
 
-  /// iOS bar. Over the artwork: no background, and a round dimmed back
-  /// button that reads on any picture. Scrolled: the system bar material
-  /// with the item's name, and the standard tinted back chevron.
-  PreferredSizeWidget _iosBar(BuildContext context,
-      {required bool transparent, String? title}) {
+  /// iOS bar, faded by [progress]. At 0, over the artwork: no
+  /// background, and a round dimmed back button that reads on any picture.
+  /// At 1: the system bar material and hairline, the item's name, and a
+  /// plain tinted chevron. In between, everything crossfades.
+  Widget _iosBar(BuildContext context,
+      {required double progress, String? title}) {
+    final chrome = CupertinoDynamicColor.resolve(iosChromeColor, context);
+    final tint = CupertinoTheme.of(context).primaryColor;
     return CupertinoNavigationBar(
       transitionBetweenRoutes: false,
       automaticBackgroundVisibility: false,
-      backgroundColor: transparent ? const Color(0x00000000) : null,
-      border: transparent
-          ? null
-          : const Border(
-              bottom: BorderSide(color: Color(0x4D000000), width: 0.0)),
-      leading: transparent
-          ? Align(
-              alignment: Alignment.centerLeft,
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(32, 32),
-                onPressed: () => Navigator.maybePop(context),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0x66000000),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(CupertinoIcons.chevron_left,
-                      color: Color(0xFFFFFFFF), size: 18),
-                ),
-              ),
-            )
-          : null,
-      middle: AnimatedOpacity(
-        opacity: transparent || title == null ? 0 : 1,
-        duration: const Duration(milliseconds: 150),
+      backgroundColor: chrome.withValues(alpha: chrome.a * progress),
+      border: Border(
+          bottom: BorderSide(
+              color: const Color(0x4D000000).withValues(alpha: 0.3 * progress),
+              width: 0.0)),
+      leading: Align(
+        alignment: Alignment.centerLeft,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(32, 32),
+          onPressed: () => Navigator.maybePop(context),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF000000)
+                  .withValues(alpha: 0.4 * (1 - progress)),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(CupertinoIcons.chevron_left,
+                color: Color.lerp(const Color(0xFFFFFFFF), tint, progress),
+                size: 18 + 4 * progress),
+          ),
+        ),
+      ),
+      middle: Opacity(
+        opacity: title == null ? 0 : progress,
         child: Text(title ?? '', overflow: TextOverflow.ellipsis),
       ),
     );
