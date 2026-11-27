@@ -94,6 +94,8 @@ flutter pub get
 flutter run
 ```
 
+To install a build on your own iPhone or iPad, signed with your own Apple account and bundle ID, see [docs/ios-personal-build.md](docs/ios-personal-build.md). Contributors using AI coding agents can find project conventions in [AGENTS.md](AGENTS.md).
+
 ## Linux
 
 If you want to build Jellyflix for Linux you need some additional dependencies:
