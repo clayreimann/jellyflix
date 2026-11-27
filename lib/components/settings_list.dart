@@ -12,13 +12,25 @@ class SettingsSection extends StatelessWidget {
   /// Optional header shown above the group on iOS.
   final Widget? header;
 
-  const SettingsSection({super.key, required this.children, this.header});
+  /// Optional small grey note under the group.
+  final Widget? footer;
+
+  const SettingsSection(
+      {super.key, required this.children, this.header, this.footer});
 
   @override
   Widget build(BuildContext context) {
     if (isCupertino(context)) {
       return CupertinoListSection.insetGrouped(
         header: header,
+        footer: footer == null
+            ? null
+            : DefaultTextStyle.merge(
+                style: TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+                child: footer!,
+              ),
         // Let the page colour show between the groups.
         backgroundColor: const Color(0x00000000),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -27,10 +39,24 @@ class SettingsSection extends StatelessWidget {
     }
     // A Material (rather than a coloured Container) so the tiles' ink
     // lands on the tinted box instead of being hidden under it.
-    return Material(
+    final box = Material(
       color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(15),
       child: Column(children: children),
+    );
+    if (footer == null) return box;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        box,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: DefaultTextStyle.merge(
+            style: Theme.of(context).textTheme.bodySmall,
+            child: footer!,
+          ),
+        ),
+      ],
     );
   }
 }

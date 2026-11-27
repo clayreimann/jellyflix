@@ -231,7 +231,7 @@ class IosLargeTitlePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return IosPageScaffold(
       body: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics()),
@@ -239,7 +239,6 @@ class IosLargeTitlePage extends StatelessWidget {
           CupertinoSliverNavigationBar(
             largeTitle: Text(title),
             trailing: trailing,
-            border: null,
             transitionBetweenRoutes: false,
           ),
           if (onRefresh != null)
@@ -346,6 +345,30 @@ class AdaptiveTextField extends StatelessWidget {
         labelText: label,
         hintText: hintText,
       ),
+    );
+  }
+}
+
+/// An iOS page: a [CupertinoPageScaffold], so a large-title nav bar stays
+/// see-through (page-coloured) until content scrolls under it, as UIKit's
+/// does. A Material [Scaffold] keeps the bar's grey always on, which made
+/// a band that content seemed to butt up against.
+class IosPageScaffold extends StatelessWidget {
+  final Widget body;
+
+  /// Grouped settings pages use the grouped grey; others the plain page.
+  final bool grouped;
+
+  const IosPageScaffold({super.key, required this.body, this.grouped = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      backgroundColor: grouped
+          ? CupertinoColors.systemGroupedBackground.resolveFrom(context)
+          : Theme.of(context).scaffoldBackgroundColor,
+      // Material widgets inside (ink, tooltips, text fields) need one.
+      child: Material(type: MaterialType.transparency, child: body),
     );
   }
 }

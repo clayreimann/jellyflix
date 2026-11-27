@@ -135,16 +135,15 @@ class SearchScreen extends HookConsumerWidget {
     if (isCupertino(context)) {
       // iOS: a large "Search" title that shrinks into the nav bar as the
       // results scroll, with the search field under it.
-      return Scaffold(
+      return IosPageScaffold(
         body: CustomScrollView(
           slivers: [
             CupertinoSliverNavigationBar(
               largeTitle: Text(l10n.search),
-              border: null,
               transitionBetweenRoutes: false,
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               sliver: SliverToBoxAdapter(child: searchField),
             ),
             if ((typed.value ?? "").isEmpty)

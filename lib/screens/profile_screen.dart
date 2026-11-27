@@ -9,6 +9,8 @@ import 'package:jellyflix/components/profile_image.dart';
 import 'package:jellyflix/components/quick_connect_dialog.dart';
 import 'package:jellyflix/components/set_download_bitrate_dialog.dart';
 import 'package:jellyflix/components/ios_sheets.dart';
+import 'package:jellyflix/models/build_info.dart';
+import 'package:jellyflix/screens/ios_licenses_screen.dart';
 import 'package:jellyflix/components/settings_list.dart';
 import 'package:jellyflix/components/switch_settings_tile.dart';
 import 'package:jellyflix/models/bitrates.dart';
@@ -425,13 +427,30 @@ class ProfileScreen extends HookConsumerWidget {
               icon: Icons.info_rounded,
               iosIcon: CupertinoIcons.info,
               title: Text(AppLocalizations.of(context)!.about),
+              opensMore: true,
               onTap: () async {
-                ref.read(appVersionProvider).whenData((versionNumber) =>
+                ref.read(appVersionProvider).whenData((versionNumber) {
+                  if (ios) {
+                    Navigator.of(context).push(CupertinoPageRoute(
+                      builder: (_) => IosLicensesScreen(
+                        applicationName: 'Jellyflix',
+                        applicationVersion: versionNumber,
+                      ),
+                    ));
+                  } else {
                     showLicensePage(
-                        context: context, applicationVersion: versionNumber));
+                        context: context, applicationVersion: versionNumber);
+                  }
+                });
               },
             ),
           ],
+          // Dev builds: which build is running, to check a new install.
+          footer: BuildInfo.show
+              ? Text(AppLocalizations.of(context)!.buildLine(
+                  ref.watch(appBuildProvider).valueOrNull ?? '…',
+                  BuildInfo.gitSha.isEmpty ? 'dev' : BuildInfo.gitSha))
+              : null,
         ),
         if (!ios) const SizedBox(height: 40),
         SettingsSection(children: [
@@ -462,12 +481,12 @@ class ProfileScreen extends HookConsumerWidget {
 
     if (ios) {
       // iOS: a large title over Settings-style grouped lists.
-      return Scaffold(
+      return IosPageScaffold(
+        grouped: true,
         body: CustomScrollView(
           slivers: [
             CupertinoSliverNavigationBar(
               largeTitle: Text(AppLocalizations.of(context)!.profile),
-              border: null,
               transitionBetweenRoutes: false,
             ),
             SliverToBoxAdapter(

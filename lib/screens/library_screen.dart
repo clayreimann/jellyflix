@@ -494,7 +494,7 @@ class LibraryScreen extends HookConsumerWidget {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(left: 15, bottom: 12),
+                padding: const EdgeInsets.only(left: 16, top: 8, bottom: 12),
                 child: Align(alignment: Alignment.topLeft, child: filterRow),
               ),
             ),

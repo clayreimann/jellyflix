@@ -299,5 +299,13 @@
         "placeholders": {
             "detail": {"type": "String"}
         }
+    },
+    "licenses": "Licenses",
+    "buildLine": "Build {build} · {sha}",
+    "@buildLine": {
+        "placeholders": {
+            "build": {"type": "String"},
+            "sha": {"type": "String"}
+        }
     }
 }
