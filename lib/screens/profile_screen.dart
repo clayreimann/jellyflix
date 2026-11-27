@@ -88,6 +88,8 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SettingsTile(
               icon: Icons.group_rounded,
+              iosIcon: CupertinoIcons.person_2_fill,
+              iosColor: CupertinoColors.systemIndigo,
               title: Text(AppLocalizations.of(context)!.changeProfile),
               onTap: () {
                 ref.read(authProvider).updateCurrentProfileId(null);
@@ -101,6 +103,8 @@ class ProfileScreen extends HookConsumerWidget {
           children: [
             SettingsTile(
               icon: Icons.connected_tv_rounded,
+              iosIcon: CupertinoIcons.tv,
+              iosColor: CupertinoColors.systemBlue,
               title: Text(AppLocalizations.of(context)!.quickConnect),
               onTap: () {
                 showDialog(
@@ -110,6 +114,8 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SettingsTile(
               icon: Icons.qr_code_rounded,
+              iosIcon: CupertinoIcons.arrow_clockwise,
+              iosColor: CupertinoColors.systemTeal,
               title: Text(AppLocalizations.of(context)!.scanLibrary),
               onTap: () async {
                 await ref.read(apiProvider).startLibraryScan();
@@ -130,6 +136,8 @@ class ProfileScreen extends HookConsumerWidget {
           children: [
             SettingsTile(
               icon: Icons.video_file_outlined,
+              iosIcon: CupertinoIcons.speedometer,
+              iosColor: CupertinoColors.systemGreen,
               title:
                   Text(AppLocalizations.of(context)!.setLocalDownloadBitrate),
               value: Text(BitRates().map[downloadBitrate.value] ?? ""),
@@ -196,6 +204,7 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SettingsTile(
               icon: Icons.delete_outline_rounded,
+              iosIcon: CupertinoIcons.trash_fill,
               title: Text(
                   AppLocalizations.of(context)!.cancelAndRemoveAllDownloads),
               destructive: ios,
@@ -219,6 +228,7 @@ class ProfileScreen extends HookConsumerWidget {
         SettingsSection(children: [
           SettingsTile(
             icon: Icons.video_settings_rounded,
+            iosIcon: CupertinoIcons.slider_horizontal_3,
             title: Text(AppLocalizations.of(context)!.customMpvConfig),
             onTap: () async {
               final result = await showDialog<String>(
@@ -239,6 +249,8 @@ class ProfileScreen extends HookConsumerWidget {
           children: [
             SwitchSettingsTile(
               leading: const Icon(Icons.image_outlined),
+              iosIcon: CupertinoIcons.photo_fill,
+              iosColor: CupertinoColors.systemPurple,
               title: Text(AppLocalizations.of(context)!.disableImageCaching),
               value: disableImageCaching.value,
               onChanged: (value) {
@@ -271,6 +283,8 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SwitchSettingsTile(
               leading: const Icon(Icons.remove_red_eye_outlined),
+              iosIcon: CupertinoIcons.eye_slash_fill,
+              iosColor: CupertinoColors.systemPink,
               title: Text(AppLocalizations.of(context)!.disableWatchlist),
               value: disableWatchlist.value,
               onChanged: (value) {
@@ -305,6 +319,8 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SwitchSettingsTile(
               leading: const Icon(Icons.amp_stories_rounded),
+              iosIcon: CupertinoIcons.photo_on_rectangle,
+              iosColor: CupertinoColors.systemOrange,
               title: Text(AppLocalizations.of(context)!.showPrimaryForEpisodes),
               value: useEpisodeImagesAsync.valueOrNull ?? false,
               onChanged: (value) async {
@@ -318,6 +334,7 @@ class ProfileScreen extends HookConsumerWidget {
           children: [
             SwitchSettingsTile(
               leading: const Icon(Icons.file_open_outlined),
+              iosIcon: CupertinoIcons.doc_text_fill,
               title: Text(AppLocalizations.of(context)!.enableLogging),
               value: loggingEnabled.value,
               onChanged: (value) async {
@@ -344,6 +361,7 @@ class ProfileScreen extends HookConsumerWidget {
             ),
             SettingsTile(
               icon: Icons.info_rounded,
+              iosIcon: CupertinoIcons.info,
               title: Text(AppLocalizations.of(context)!.about),
               onTap: () async {
                 ref.read(appVersionProvider).whenData((versionNumber) =>
@@ -357,6 +375,7 @@ class ProfileScreen extends HookConsumerWidget {
         SettingsSection(children: [
           SettingsTile(
             icon: Icons.logout,
+            iosIcon: CupertinoIcons.square_arrow_right,
             destructive: true,
             title: Text(AppLocalizations.of(context)!.logout),
             onTap: () async {

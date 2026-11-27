@@ -38,6 +38,11 @@ class SettingsSection extends StatelessWidget {
 /// One settings row: a [CupertinoListTile] on iOS, a [ListTile] elsewhere.
 class SettingsTile extends StatelessWidget {
   final IconData icon;
+
+  /// The iOS glyph (a [CupertinoIcons] icon) and badge colour. Falls back
+  /// to [icon] on a grey badge.
+  final IconData? iosIcon;
+  final Color? iosColor;
   final Widget title;
 
   /// The current value, shown at the trailing edge (e.g. "8 Mb/s").
@@ -56,6 +61,8 @@ class SettingsTile extends StatelessWidget {
   const SettingsTile({
     super.key,
     required this.icon,
+    this.iosIcon,
+    this.iosColor,
     required this.title,
     this.value,
     this.control,
@@ -68,12 +75,14 @@ class SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final error = Theme.of(context).colorScheme.error;
     if (isCupertino(context)) {
-      final tint = destructive ? error : Theme.of(context).colorScheme.primary;
+      final red = CupertinoColors.systemRed.resolveFrom(context);
       return CupertinoListTile(
-        leading: Icon(icon, color: tint, size: 24),
+        leading: SettingsIconBadge(
+          icon: iosIcon ?? icon,
+          color: destructive ? red : iosColor,
+        ),
         title: destructive
-            ? DefaultTextStyle.merge(
-                style: TextStyle(color: error), child: title)
+            ? DefaultTextStyle.merge(style: TextStyle(color: red), child: title)
             : title,
         additionalInfo: value,
         trailing:
@@ -87,6 +96,29 @@ class SettingsTile extends StatelessWidget {
       title: title,
       trailing: control ?? value,
       onTap: onTap,
+    );
+  }
+}
+
+/// The iOS Settings-app icon: a white glyph on a small coloured rounded
+/// square.
+class SettingsIconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+
+  const SettingsIconBadge({super.key, required this.icon, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 29,
+      height: 29,
+      decoration: BoxDecoration(
+        color: CupertinoDynamicColor.resolve(
+            color ?? CupertinoColors.systemGrey, context),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Icon(icon, color: const Color(0xFFFFFFFF), size: 18),
     );
   }
 }
