@@ -140,6 +140,22 @@ final downloadSizeProvider =
   return ref.read(downloadProvider(itemId)).sizeOnDisk();
 });
 
+/// Combined size on disk of several downloads (a show's episodes), keyed by
+/// their ids joined with commas.
+final downloadItemsSizeProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, ids) async {
+  int total = 0;
+  for (var id in ids.split(",")) {
+    if (id.isEmpty) continue;
+    total += await ref.read(downloadProvider(id)).sizeOnDisk();
+  }
+  return total;
+});
+
+/// Key for [downloadItemsSizeProvider].
+String downloadSizeKey(Iterable<DownloadMetadata> items) =>
+    items.map((e) => e.id).join(",");
+
 class DownloadedSeason {
   final int seasonNumber;
   final String? seasonName;

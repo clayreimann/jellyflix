@@ -206,6 +206,10 @@ class _ShowCard extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final isWide = MediaQuery.of(context).size.width >= 640;
     final width = isWide ? 160.0 : 120.0;
+    final size = ref
+            .watch(downloadItemsSizeProvider(downloadSizeKey(show.episodes)))
+            .value ??
+        0;
     final downloading = show.episodes.length -
         show.episodes
             .where((e) =>
@@ -237,7 +241,10 @@ class _ShowCard extends ConsumerWidget {
             Text(
               downloading > 0
                   ? "${l10n.episodeCount(show.episodes.length)} · ${l10n.downloadStatusDownloading(((show.episodes.length - downloading) / show.episodes.length * 100).round())}"
-                  : l10n.episodeCount(show.episodes.length),
+                  : [
+                      l10n.episodeCount(show.episodes.length),
+                      if (size > 0) formatBytes(size),
+                    ].join(" · "),
               maxLines: 2,
               style: Theme.of(context).textTheme.bodySmall,
             ),
