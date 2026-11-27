@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/models/auth_state.dart';
 
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:jellyflix/components/responsive_navigation_bar.dart';
 import 'package:jellyflix/models/screen_paths.dart';
 import 'package:jellyflix/providers/auth_provider.dart';
@@ -151,7 +152,7 @@ class AppRouter {
       GoRoute(
         path: '${ScreenPaths.login}/:server/${LoginRouteNames.password}',
         name: LoginRouteNames.password,
-        pageBuilder: (context, state) => buildPageWithDefaultTransition(
+        pageBuilder: (context, state) => buildPushedPage(
           context: context,
           state: state,
           maintainState: false,
@@ -162,7 +163,7 @@ class AppRouter {
       GoRoute(
         path: '${ScreenPaths.login}/:server/${LoginRouteNames.quickConnect}',
         name: LoginRouteNames.quickConnect,
-        pageBuilder: (context, state) => buildPageWithDefaultTransition(
+        pageBuilder: (context, state) => buildPushedPage(
           context: context,
           state: state,
           maintainState: false,
@@ -237,6 +238,30 @@ class AppRouter {
       maintainState: maintainState,
       transitionsBuilder: (context, animation, secondaryAnimation, child) =>
           FadeTransition(opacity: animation, child: child),
+    );
+  }
+
+  /// A page pushed on top of another one. On iOS it slides in from the
+  /// right and can be swiped back from the left edge; elsewhere it keeps
+  /// the default fade.
+  Page buildPushedPage<T>({
+    required BuildContext context,
+    required GoRouterState state,
+    required Widget child,
+    bool maintainState = true,
+  }) {
+    if (isCupertinoPlatform) {
+      return CupertinoPage<T>(
+        key: state.pageKey,
+        maintainState: maintainState,
+        child: child,
+      );
+    }
+    return buildPageWithDefaultTransition<T>(
+      context: context,
+      state: state,
+      maintainState: maintainState,
+      child: child,
     );
   }
 

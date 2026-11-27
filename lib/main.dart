@@ -8,6 +8,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:jellyflix/providers/router_provider.dart';
 import 'package:jellyflix/providers/scaffold_key.dart';
 import 'package:jellyflix/services/database_service.dart';
@@ -65,6 +66,8 @@ class MyApp extends ConsumerWidget {
             MaterialUiCompatibilityBridge(child: child!),
         title: "Jellyflix",
         theme: ThemeData(
+          // iOS has no ink ripple: taps only highlight.
+          splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: CupertinoPageTransitionsBuilder(),

@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:material_ui/material_ui.dart';
 
 class SwitchSettingsTile extends StatelessWidget {
@@ -18,7 +19,7 @@ class SwitchSettingsTile extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       leading: leading,
       title: title,
-      trailing: Switch(
+      trailing: AdaptiveSwitch(
         value: value,
         onChanged: onChanged,
       ),

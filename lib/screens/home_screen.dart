@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jellyflix/components/future_item_carousel.dart';
 import 'package:jellyflix/components/genre_banner.dart';
@@ -32,7 +33,7 @@ class HomeScreen extends HookConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(),
+              const AdaptiveProgressIndicator(),
               const SizedBox(height: 20),
               TextButton(
                 style: TextButton.styleFrom(

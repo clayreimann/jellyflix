@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'dart:async';
 
 import 'package:device_info_plus/device_info_plus.dart';
@@ -59,15 +60,17 @@ class _PlayerSreenState extends ConsumerState<PlayerScreen> {
 
         player.stream.error.listen((error) {
           if (mounted) {
-            showDialog(
+            showAdaptivePlatformDialog(
                 context: context,
+                barrierDismissible: true,
                 builder: (context) {
-                  return AlertDialog(
+                  return AdaptiveAlertDialog(
                     title: const Text("An error occured"),
                     content: Text(
                         "There was an error while loading the stream: $error"),
                     actions: [
-                      TextButton(
+                      AdaptiveDialogAction(
+                        isDefaultAction: true,
                         onPressed: () {
                           context.pop();
                         },
