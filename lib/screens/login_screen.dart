@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,7 +66,7 @@ class LoginScreen extends HookConsumerWidget {
                                   builder: (context, isLoading, _) {
                                     return isLoading
                                         ? const Center(
-                                            child: CircularProgressIndicator())
+                                            child: AdaptiveProgressIndicator())
                                         : FilledButton(
                                             onPressed: () => loginToServer(
                                                 context,
@@ -86,7 +87,7 @@ class LoginScreen extends HookConsumerWidget {
                                   builder: (context, isLoading, _) {
                                     return isLoading
                                         ? const Center(
-                                            child: CircularProgressIndicator())
+                                            child: AdaptiveProgressIndicator())
                                         : FilledButton(
                                             onPressed: () => loginToServer(
                                                 context,

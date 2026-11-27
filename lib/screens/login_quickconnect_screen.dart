@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -82,7 +83,7 @@ class LoginQuickConnectScreen extends HookConsumerWidget {
                             ? const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 20.0),
                                 child:
-                                    Center(child: CircularProgressIndicator()))
+                                    Center(child: AdaptiveProgressIndicator()))
                             : Column(
                                 children: [
                                   Padding(
