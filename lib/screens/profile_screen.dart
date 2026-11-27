@@ -143,13 +143,12 @@ class ProfileScreen extends HookConsumerWidget {
                 // show dialog
                 final l10n = AppLocalizations.of(context)!;
                 var result = ios
-                    ? await showIosChoiceSheet<int>(
+                    ? await showIosChoicePicker<int>(
                         context: context,
-                        title: Text(l10n.setLocalDownloadBitrate),
-                        message: Text(l10n.maxDownloadBitrateText),
+                        title: l10n.setLocalDownloadBitrate,
+                        footer: l10n.maxDownloadBitrateText,
                         options: BitRates().map,
                         selected: downloadBitrate.value,
-                        cancelLabel: l10n.cancel,
                       )
                     : await showDialog(
                         context: context,
