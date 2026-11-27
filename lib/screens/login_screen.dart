@@ -7,12 +7,15 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/models/screen_paths.dart';
 
+// Login page is rebuilt (maintainState: false) when backing out of a failed login.
+String _lastServerAddress = '';
+
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final serverAddress = useTextEditingController();
+    final serverAddress = useTextEditingController(text: _lastServerAddress);
 
     final loadingListenable = useValueNotifier<bool>(false);
 
@@ -119,6 +122,7 @@ class LoginScreen extends HookConsumerWidget {
   void loginToServer(
       BuildContext context, final String serverAddress, String routeName) {
     if (serverAddress.isNotEmpty) {
+      _lastServerAddress = serverAddress;
       context.pushNamed(routeName, pathParameters: {'server': serverAddress});
     }
   }

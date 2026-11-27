@@ -6,10 +6,12 @@ import 'package:jellyflix/models/auth_state.dart';
 
 import 'package:jellyflix/components/responsive_navigation_bar.dart';
 import 'package:jellyflix/models/screen_paths.dart';
+import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/providers/auth_provider.dart';
 import 'package:jellyflix/providers/connectivity_provider.dart';
 import 'package:jellyflix/screens/detail_screen.dart';
 import 'package:jellyflix/screens/download_screen.dart';
+import 'package:jellyflix/screens/downloaded_show_screen.dart';
 import 'package:jellyflix/screens/home_screen.dart';
 import 'package:jellyflix/screens/library_screen.dart';
 import 'package:jellyflix/screens/loading_screen.dart';
@@ -93,6 +95,15 @@ class AppRouter {
                   ),
                   routes: [
                     ...buildSharedRoutes(ScreenPaths.downloads),
+                    GoRoute(
+                      name: ScreenPaths.downloads + ScreenPaths.downloadedShow,
+                      path: ScreenPaths.downloadedShow,
+                      pageBuilder: (context, state) => CupertinoPage(
+                        child: DownloadedShowScreen(
+                          seriesId: state.uri.queryParameters['seriesId']!,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -182,12 +193,8 @@ class AppRouter {
       return const LoadingScreen();
     },
     redirect: (context, state) async {
-      final isGoingToOfflinePlayer = state.matchedLocation ==
-          '${ScreenPaths.downloads}/${ScreenPaths.player}';
-      final isGoingToDownloads = state.matchedLocation == ScreenPaths.downloads;
       final isGoingToLogin = state.matchedLocation == ScreenPaths.login;
       final isGoingToLoading = state.matchedLocation == ScreenPaths.loading;
-      final isGoingToProfile = state.matchedLocation == ScreenPaths.profile;
       final isConnected =
           await _ref.read(connectivityProvider).checkConnectivityOnce();
 
@@ -211,14 +218,25 @@ class AppRouter {
         }
         return null;
       } else {
-        if (!isGoingToDownloads &&
-            !isGoingToOfflinePlayer &&
-            !isGoingToProfile &&
-            !isGoingToLogin &&
-            !isGoingToLoading) {
-          return ScreenPaths.downloads;
+        final authState = _ref.read(authStateProvider.notifier).state;
+        final offline = !isConnected || authState == AuthState.offline;
+        final authService = _ref.read(authProvider);
+        final hasProfile = authService.currentProfileid() != null;
+        final target = offlineRedirect(
+          location: state.matchedLocation,
+          offline: offline,
+          hasProfile: hasProfile,
+        );
+        if (target == ScreenPaths.downloads && offline && hasProfile) {
+          // Use the saved profile without contacting the server, so the
+          // downloads, cached library and artwork belong to the right user.
+          final api = _ref.read(apiProvider);
+          api.offline = true;
+          if (api.currentUser == null) {
+            await authService.restoreOfflineSession();
+          }
         }
-        return null;
+        return target;
       }
     },
     refreshListenable: GoRouterRefreshStream(_ref),
@@ -276,4 +294,28 @@ class GoRouterRefreshStream extends ChangeNotifier {
       notifyListeners();
     });
   }
+}
+
+/// Where to go while the server can't be reached (or before we know).
+///
+/// Only Downloads, the Library (served from the offline cache) and Profile
+/// work offline. Login and the loading screen would wait for the server
+/// forever, so with a saved profile they go straight to Downloads; picking
+/// a profile on the profile screen lands there too. Returns null to stay.
+String? offlineRedirect({
+  required String location,
+  required bool offline,
+  required bool hasProfile,
+}) {
+  final isGoingToLogin = location == ScreenPaths.login;
+  final isGoingToLoading = location == ScreenPaths.loading;
+  if (isGoingToLogin || isGoingToLoading) {
+    return offline && hasProfile ? ScreenPaths.downloads : null;
+  }
+  if (location.startsWith(ScreenPaths.downloads) ||
+      location.startsWith(ScreenPaths.library) ||
+      location == ScreenPaths.profile) {
+    return null;
+  }
+  return ScreenPaths.downloads;
 }

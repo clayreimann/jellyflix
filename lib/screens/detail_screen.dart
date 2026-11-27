@@ -18,6 +18,8 @@ import 'package:jellyflix/components/item_carousel.dart';
 import 'package:jellyflix/models/screen_paths.dart';
 import 'package:jellyflix/models/skeleton_item.dart';
 import 'package:jellyflix/providers/api_provider.dart';
+import 'package:jellyflix/providers/download_provider.dart';
+import 'package:jellyflix/providers/offline_provider.dart';
 import 'package:jellyflix/components/description_text.dart';
 import 'package:jellyflix/components/episode_list.dart';
 import 'package:jellyflix/components/item_information_details.dart';
@@ -86,7 +88,7 @@ class DetailScreen extends HookConsumerWidget {
               ),
             ),
       body: FutureBuilder(
-          future: ref.read(apiProvider).getItemDetails(itemId),
+          future: _loadDetails(ref),
           builder: (context, AsyncSnapshot<BaseItemDto> snapshot) {
             BaseItemDto data = SkeletonItem.baseItemDto;
             if (snapshot.hasError) {
@@ -99,6 +101,15 @@ class DetailScreen extends HookConsumerWidget {
               if (data.type == BaseItemKind.series) {
                 ref.read(apiProvider).getEpisodes(itemId).then((value) {
                   episodeStreamController.add(value);
+                }).catchError((e) async {
+                  // offline without cached metadata: list downloaded episodes
+                  final library =
+                      await ref.read(downloadLibraryProvider.future);
+                  final episodes = library.show(itemId)?.episodes ?? [];
+                  if (!episodeStreamController.isClosed) {
+                    episodeStreamController
+                        .add(episodes.map(baseItemFromDownload).toList());
+                  }
                 });
               }
               return Align(
@@ -283,6 +294,7 @@ class DetailScreen extends HookConsumerWidget {
                           markedAsPlayed: markedAsPlayed,
                           streamController: episodeStreamController,
                           goToPlayerScreen: goToPlayerScreen,
+                          goToOfflinePlayer: goToOfflinePlayer,
                         ),
                       ),
 
@@ -399,6 +411,43 @@ class DetailScreen extends HookConsumerWidget {
             }
           }),
     );
+  }
+
+  /// Item details, falling back to what's known from downloads when the
+  /// server is unreachable and the item isn't in the offline cache.
+  Future<BaseItemDto> _loadDetails(WidgetRef ref) async {
+    try {
+      return await ref.read(apiProvider).getItemDetails(itemId);
+    } catch (e) {
+      final library = await ref.read(downloadLibraryProvider.future);
+      final show = library.show(itemId);
+      if (show != null) {
+        return BaseItemDto((b) => b
+          ..id = itemId
+          ..name = show.seriesName
+          ..type = BaseItemKind.series
+          ..isFolder = true
+          ..userData.played = false
+          ..userData.playbackPositionTicks = 0);
+      }
+      final download = [
+        ...library.movies,
+        for (var s in library.shows) ...s.episodes
+      ].where((m) => m.id == itemId).firstOrNull;
+      if (download != null) return baseItemFromDownload(download);
+      rethrow;
+    }
+  }
+
+  Future<void> goToOfflinePlayer(
+      WidgetRef ref, String itemId, BuildContext context, String title) async {
+    var playerHelper =
+        await ref.read(offlinePlayerHelperProvider(itemId).future);
+    if (context.mounted) {
+      context.pushNamed(parentPath + ScreenPaths.player,
+          queryParameters: {"startTimeTicks": "0", "title": title},
+          extra: playerHelper);
+    }
   }
 
   Future<void> goToPlayerScreen(WidgetRef ref, String itemId,

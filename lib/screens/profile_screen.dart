@@ -26,6 +26,9 @@ class ProfileScreen extends HookConsumerWidget {
     final downloadBitrate = useState(
         ref.read(databaseProvider("settings")).get("downloadBitrate") ??
             BitRates.defaultBitrate());
+    final maxConcurrentDownloads = useState<int>(
+        ref.read(databaseProvider("settings")).get(maxConcurrentDownloadsKey) ??
+            defaultMaxConcurrentDownloads);
     final disableImageCaching = useState(
         ref.read(databaseProvider("settings")).get("disableImageCaching") ??
             false);
@@ -208,11 +211,35 @@ class ProfileScreen extends HookConsumerWidget {
                           ListTile(
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15)),
+                            leading: const Icon(Icons.downloading_rounded),
+                            title: Text(AppLocalizations.of(context)!
+                                .simultaneousDownloads),
+                            trailing:
+                                Text(maxConcurrentDownloads.value.toString()),
+                            onTap: () async {
+                              final int? result = await showDialog<int>(
+                                  context: context,
+                                  builder: (context) =>
+                                      _SimultaneousDownloadsDialog(
+                                          value: maxConcurrentDownloads.value));
+                              if (result != null) {
+                                maxConcurrentDownloads.value = result;
+                                await ref
+                                    .read(databaseProvider("settings"))
+                                    .put(maxConcurrentDownloadsKey, result);
+                                // a higher limit can start waiting ones now
+                                ref.read(downloadQueueProvider).pump();
+                              }
+                            },
+                          ),
+                          ListTile(
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15)),
                             leading: const Icon(Icons.delete_outline_rounded),
                             title: Text(AppLocalizations.of(context)!
                                 .cancelAndRemoveAllDownloads),
                             onTap: () async {
-                              await ref.read(cancelAndDeleteDownloadProvider);
+                              await ref.read(cancelAndDeleteDownloadProvider)();
                             },
                           ),
                         ],
@@ -426,6 +453,35 @@ class ProfileScreen extends HookConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SimultaneousDownloadsDialog extends StatelessWidget {
+  final int value;
+  const _SimultaneousDownloadsDialog({required this.value});
+
+  static const options = [1, 2, 3, 5, 10];
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return SimpleDialog(
+      title: Text(l10n.simultaneousDownloads),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+          child: Text(l10n.simultaneousDownloadsText),
+        ),
+        for (var option in options)
+          ListTile(
+            leading: Icon(option == value
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked),
+            title: Text(option.toString()),
+            onTap: () => Navigator.pop(context, option),
+          ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -6,6 +7,33 @@ import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/providers/database_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:transparent_image/transparent_image.dart';
+
+/// Image cache for server artwork. Much larger and longer-lived than the
+/// default (200 images, 30 days) so posters stay available offline.
+class JfxImageCacheManager extends CacheManager with ImageCacheManager {
+  static const key = 'jellyflixImageCache';
+  static final JfxImageCacheManager instance = JfxImageCacheManager._();
+
+  JfxImageCacheManager._()
+      : super(Config(
+          key,
+          stalePeriod: const Duration(days: 365),
+          maxNrOfCacheObjects: 20000,
+        ));
+
+  /// Downloads the given images into the cache if they aren't there yet.
+  static Future<void> prefetch(
+      Iterable<String> urls, Map<String, String> headers) async {
+    for (var url in urls) {
+      try {
+        if (await instance.getFileFromCache(url) != null) continue;
+        await instance.downloadFile(url, authHeaders: headers);
+      } catch (_) {
+        // missing artwork is fine
+      }
+    }
+  }
+}
 
 class JellyfinImage extends HookConsumerWidget {
   final String id;
@@ -46,6 +74,7 @@ class JellyfinImage extends HookConsumerWidget {
     }
 
     return CachedNetworkImage(
+      cacheManager: JfxImageCacheManager.instance,
       width: double.infinity,
       imageUrl: url,
       httpHeaders: ref.read(apiProvider).headers,

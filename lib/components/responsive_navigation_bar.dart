@@ -55,9 +55,11 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
                       selectedIndex.value == 4 ? null : selectedIndex.value,
                   // Called when one tab is selected
                   onDestinationSelected: (int index) async {
-                    bool online = await showOfflineSnackbar(
-                        context, ref.read(authStateProvider.notifier).state);
-                    if (online || index == 2) {
+                    bool online = index == 2 ||
+                        index == 3 ||
+                        await showOfflineSnackbar(context,
+                            ref.read(authStateProvider.notifier).state);
+                    if (online) {
                       selectedIndex.value = index;
                     }
                     navigationShell.goBranch(
@@ -180,11 +182,8 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
                       label: AppLocalizations.of(context)!.library,
                       selected: selectedIndex.value == 3,
                       onTap: () async {
-                        bool online = await showOfflineSnackbar(context,
-                            ref.read(authStateProvider.notifier).state);
-                        if (online) {
-                          selectedIndex.value = 3;
-                        }
+                        // the library works offline from the cached metadata
+                        selectedIndex.value = 3;
                         navigationShell.goBranch(3,
                             initialLocation: navigationShell.currentIndex == 3);
                       },
@@ -223,9 +222,12 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
               showUnselectedLabels: false,
               // called when one tab is selected
               onTap: (int index) async {
-                bool online = await showOfflineSnackbar(
-                    context, ref.read(authStateProvider.notifier).state);
-                if (online || index == 2 || index == 4) {
+                bool online = index == 2 ||
+                    index == 3 ||
+                    index == 4 ||
+                    await showOfflineSnackbar(
+                        context, ref.read(authStateProvider.notifier).state);
+                if (online) {
                   selectedIndex.value = index;
                 }
                 navigationShell.goBranch(

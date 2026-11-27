@@ -195,26 +195,41 @@ class StreamPlayerHelper extends PlayerHelper {
 
     _apiService.reportStartPlayback(startTimeTicks);
 
-    playbackTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      await _apiService.reportPlaybackProgress(
-        player.state.position.inMilliseconds * 10000,
-        audioStreamIndex: audioStream.index,
-        subtitleStreamIndex: subtitle.index,
-      );
+    // On a slow connection a report can take longer than the interval:
+    // skip a tick rather than pile up requests that can land out of order,
+    // and let the stop report wait for one still in flight (otherwise it
+    // could land after the stop and rewind the saved position).
+    playbackTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_progressReport != null) return;
+      _progressReport = _apiService
+          .reportPlaybackProgress(
+            player.state.position.inMilliseconds * 10000,
+            audioStreamIndex: audioStream.index,
+            subtitleStreamIndex: subtitle.index,
+          )
+          .then((_) {}, onError: (_) {
+        // a missed progress report isn't worth crashing playback over
+      }).whenComplete(() => _progressReport = null);
     });
   }
+
+  Future<void>? _progressReport;
 
   @override
   Future<void> completedPlayback() async {
     playbackTimer?.cancel();
-    await _apiService
-        .reportStopPlayback(player.state.position.inMilliseconds * 10000);
+    final ticks = player.state.position.inMilliseconds * 10000;
+    await _progressReport;
+    await _apiService.reportStopPlayback(ticks);
   }
 
   @override
   Future<void> backButtonPressed() async {
     playbackTimer?.cancel();
-    _apiService
-        .reportStopPlayback(player.state.position.inMilliseconds * 10000);
+    final ticks = player.state.position.inMilliseconds * 10000;
+    // reported in the background, after any progress report in flight
+    (_progressReport ?? Future.value())
+        .then((_) => _apiService.reportStopPlayback(ticks))
+        .ignore();
   }
 }

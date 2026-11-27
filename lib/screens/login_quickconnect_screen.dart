@@ -100,12 +100,30 @@ class LoginQuickConnectScreen extends HookConsumerWidget {
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 10.0),
-                                    child: Text(
-                                      code.value ?? "",
-                                      textAlign: TextAlign.left,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // selectable, and tap or the
+                                        // button copies it, to paste into
+                                        // another signed-in app
+                                        SelectableText(
+                                          code.value ?? "",
+                                          onTap: () =>
+                                              _copyCode(context, code.value),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge,
+                                        ),
+                                        IconButton(
+                                          tooltip:
+                                              AppLocalizations.of(context)!
+                                                  .copyCode,
+                                          icon: const Icon(Icons.copy_rounded),
+                                          onPressed: () =>
+                                              _copyCode(context, code.value),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -123,5 +141,14 @@ class LoginQuickConnectScreen extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  static Future<void> _copyCode(BuildContext context, String? code) async {
+    if (code == null || code.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final copied = AppLocalizations.of(context)!.codeCopied;
+    await Clipboard.setData(ClipboardData(text: code));
+    messenger.showSnackBar(SnackBar(
+        content: Text(copied), duration: const Duration(seconds: 2)));
   }
 }
