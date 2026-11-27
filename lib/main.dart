@@ -4,7 +4,8 @@ import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:universal_io/io.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:jellyflix/providers/router_provider.dart';
@@ -54,6 +55,14 @@ class MyApp extends ConsumerWidget {
         routerDelegate: appRouter.routerDelegate,
         routeInformationProvider: appRouter.routeInformationProvider,
         debugShowCheckedModeBanner: false,
+        // Some dependencies (filter_list, media_kit_video, skeletonizer,
+        // cached_network_image...) still use the deprecated
+        // package:flutter/material.dart. Without this bridge they would read
+        // that library's default light theme instead of ours. Remove once
+        // they have migrated to material_ui.
+        builder: (context, child) =>
+            // ignore: deprecated_member_use
+            MaterialUiCompatibilityBridge(child: child!),
         title: "Jellyflix",
         theme: ThemeData(
           pageTransitionsTheme: const PageTransitionsTheme(
