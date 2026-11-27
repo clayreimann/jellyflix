@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:jellyflix/models/user.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/navigation/app_router.dart';
 import 'package:jellyflix/services/device_info_service.dart';
 import 'package:jellyflix/services/jfx_logger.dart';

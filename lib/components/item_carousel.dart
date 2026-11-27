@@ -4,7 +4,7 @@ import 'package:jellyflix/components/item_carousel_label.dart';
 import 'package:jellyflix/components/jfx_tile.dart';
 import 'package:jellyflix/components/jfx_layout.dart';
 import 'package:jellyflix/models/poster_type.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/providers/input_mode_provider.dart';
 

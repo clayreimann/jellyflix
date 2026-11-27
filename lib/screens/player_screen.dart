@@ -2,7 +2,7 @@ import 'package:jellyflix/components/adaptive.dart';
 import 'dart:async';
 
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';

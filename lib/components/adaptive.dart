@@ -1,6 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// iOS-only look-and-feel helpers.
 ///
@@ -128,5 +128,72 @@ class AdaptiveDialogAction extends StatelessWidget {
       );
     }
     return materialButton ?? TextButton(onPressed: onPressed, child: child);
+  }
+}
+
+/// A top bar: a [CupertinoNavigationBar] (chevron back button, blurred
+/// translucent background) on iOS, an [AppBar] elsewhere.
+///
+/// [transparent] makes the bar see-through with no hairline, for pages that
+/// draw artwork behind it.
+PreferredSizeWidget adaptiveAppBar(
+  BuildContext context, {
+  Widget? title,
+  List<Widget> actions = const [],
+  bool transparent = false,
+}) {
+  if (isCupertino(context)) {
+    return CupertinoNavigationBar(
+      middle: title,
+      trailing: actions.isEmpty
+          ? null
+          : Row(mainAxisSize: MainAxisSize.min, children: actions),
+      backgroundColor: transparent ? const Color(0x00000000) : null,
+      border: transparent ? null : _defaultNavBarBorder,
+      // Pages come from go_router with mixed transitions; flying titles
+      // between them look wrong, so each bar stays put.
+      transitionBetweenRoutes: false,
+    );
+  }
+  return AppBar(
+    title: title,
+    actions: actions,
+    backgroundColor: transparent ? Colors.transparent : null,
+  );
+}
+
+const Border _defaultNavBarBorder = Border(
+  bottom: BorderSide(color: Color(0x4D000000), width: 0.0),
+);
+
+/// A search field: [CupertinoSearchTextField] on iOS, a Material
+/// [SearchBar] elsewhere.
+class AdaptiveSearchField extends StatelessWidget {
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  const AdaptiveSearchField({
+    super.key,
+    required this.hintText,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isCupertino(context)) {
+      return CupertinoSearchTextField(
+        placeholder: hintText,
+        onChanged: onChanged,
+      );
+    }
+    return SizedBox(
+      width: double.infinity,
+      height: 40,
+      child: SearchBar(
+        hintText: hintText,
+        leading: const Icon(Icons.search_rounded),
+        onChanged: onChanged,
+      ),
+    );
   }
 }

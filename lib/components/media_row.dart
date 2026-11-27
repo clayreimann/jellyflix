@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The one row layout for episodes and downloads everywhere in the app:
 /// 16:9 artwork, title, a details line, optional status and description,

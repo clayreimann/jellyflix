@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/components/download_settings_dialog.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';

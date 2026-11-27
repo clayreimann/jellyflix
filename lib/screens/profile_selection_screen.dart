@@ -1,5 +1,5 @@
 import 'package:jellyflix/components/adaptive.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/components/profile_card.dart';
@@ -17,7 +17,8 @@ class ProfileSelectionScreen extends HookConsumerWidget {
     final allProfiles = ref.watch(allProfilesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context)!.selectProfile)),
+      appBar: adaptiveAppBar(context,
+          title: Text(AppLocalizations.of(context)!.selectProfile)),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 30.0),
         child: allProfiles.when(

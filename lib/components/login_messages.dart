@@ -1,6 +1,6 @@
 import 'package:jellyflix/components/adaptive.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 

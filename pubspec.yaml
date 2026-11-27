@@ -8,6 +8,8 @@ version: 00.00.00+0
 
 environment:
   sdk: ">=3.5.4 <4.0.0"
+  # material_ui and cupertino_ui need Flutter 3.47 or newer.
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
@@ -63,7 +65,8 @@ dependencies:
   markdown: ^7.3.0
   flutter_widget_from_html_core: ^0.15.2
   file_saver: ^0.2.14
-
+  material_ui: ^1.11.1
+  cupertino_ui: ^1.1.7
 dependency_overrides:
   flutter_secure_storage_web: ^2.0.0-beta.2
   media_kit:

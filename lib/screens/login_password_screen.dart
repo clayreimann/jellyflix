@@ -1,7 +1,7 @@
 import 'package:jellyflix/components/adaptive.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -24,7 +24,7 @@ class LoginPasswordScreen extends HookConsumerWidget {
     final loadingListenable = useValueNotifier<bool>(false);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: adaptiveAppBar(context),
       body: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.enter): () async {

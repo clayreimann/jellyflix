@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:jellyflix/components/jellyfin_image.dart';
 import 'package:jellyflix/components/focus_border.dart';

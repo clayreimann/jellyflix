@@ -4,8 +4,8 @@ import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:universal_io/io.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:jellyflix/components/adaptive.dart';
@@ -45,6 +45,10 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appRouter = ref.read(routerProvider).router;
+    final colorScheme = ColorScheme.fromSeed(
+        seedColor: Colors.deepPurple,
+        primary: const Color(0xFFDBEBC0),
+        brightness: Brightness.dark);
     return InputDetector(
       child: MaterialApp.router(
         scaffoldMessengerKey: rootScaffoldMessengerKey,
@@ -56,6 +60,14 @@ class MyApp extends ConsumerWidget {
         routerDelegate: appRouter.routerDelegate,
         routeInformationProvider: appRouter.routeInformationProvider,
         debugShowCheckedModeBanner: false,
+        // Some dependencies (filter_list, media_kit_video, skeletonizer,
+        // cached_network_image...) still use the deprecated
+        // package:flutter/material.dart. Without this bridge they would read
+        // that library's default light theme instead of ours. Remove once
+        // they have migrated to material_ui.
+        builder: (context, child) =>
+            // ignore: deprecated_member_use
+            MaterialUiCompatibilityBridge(child: child!),
         title: "Jellyflix",
         theme: ThemeData(
           // iOS has no ink ripple: taps only highlight.
@@ -66,11 +78,22 @@ class MyApp extends ConsumerWidget {
               TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
             },
           ),
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.deepPurple,
-              primary: const Color(0xFFDBEBC0),
-              brightness: Brightness.dark),
+          colorScheme: colorScheme,
           useMaterial3: true,
+          // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
+          // app's accent and iOS's dark bar colours. Android never builds
+          // Cupertino widgets, so this has no effect there.
+          cupertinoOverrideTheme: isCupertinoPlatform
+              ? CupertinoThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: colorScheme.primary,
+                  // The page colour, slightly see-through so the bars blur
+                  // what scrolls under them.
+                  barBackgroundColor:
+                      colorScheme.surface.withValues(alpha: 0.94),
+                  scaffoldBackgroundColor: colorScheme.surface,
+                )
+              : null,
         ),
       ),
     );

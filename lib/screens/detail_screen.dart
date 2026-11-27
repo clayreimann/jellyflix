@@ -4,7 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/providers/player_helper_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -69,25 +69,28 @@ class DetailScreen extends HookConsumerWidget {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: appBarColorTransaparent.value
-          ? AppBar(
-              backgroundColor: Colors.transparent,
-            )
-          : PreferredSize(
-              preferredSize: const Size(
-                double.infinity,
-                56.0,
-              ),
-              child: ClipRRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: AppBar(
-                    elevation: 0.0,
-                    backgroundColor: Colors.black.withValues(alpha: 0.2),
+      appBar: isCupertino(context)
+          // iOS: see-through over the artwork, blurred bar once scrolled.
+          ? adaptiveAppBar(context, transparent: appBarColorTransaparent.value)
+          : appBarColorTransaparent.value
+              ? AppBar(
+                  backgroundColor: Colors.transparent,
+                )
+              : PreferredSize(
+                  preferredSize: const Size(
+                    double.infinity,
+                    56.0,
+                  ),
+                  child: ClipRRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                      child: AppBar(
+                        elevation: 0.0,
+                        backgroundColor: Colors.black.withValues(alpha: 0.2),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
       body: FutureBuilder(
           future: _loadDetails(ref),
           builder: (context, AsyncSnapshot<BaseItemDto> snapshot) {
