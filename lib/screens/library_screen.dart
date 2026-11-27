@@ -1,6 +1,8 @@
 import 'dart:ui';
 
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -87,6 +89,228 @@ class LibraryScreen extends HookConsumerWidget {
       return null;
     }, []);
 
+    final Widget filterRow = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!((genreFilter.value == null || genreFilter.value!.isEmpty) &&
+              filterType.value.isEmpty &&
+              sortOrder.value == SortOrder.ascending &&
+              sortType.value == ItemSortBy.sortName &&
+              selectedLibrary.value == null))
+            TextButton(
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith(
+                      (states) => Theme.of(context).secondaryHeaderColor),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.filter_list),
+                    Icon(Icons.close_outlined),
+                  ],
+                ),
+                onPressed: () {
+                  genreFilter.value = null;
+                  filterType.value.isEmpty;
+                  sortType.value = ItemSortBy.sortName;
+                  sortOrder.value = SortOrder.ascending;
+                  order.value = AppLocalizations.of(context)!.ascending;
+                  selectedLibrary.value = null;
+                  filterType.value = [];
+                }),
+          if (!((genreFilter.value == null || genreFilter.value!.isEmpty) &&
+              filterType.value.isEmpty &&
+              sortOrder.value == SortOrder.ascending &&
+              sortType.value == ItemSortBy.sortName &&
+              selectedLibrary.value == null))
+            const SizedBox(
+              width: 10,
+            ),
+          FilterButton(
+            text:
+                "${AppLocalizations.of(context)!.library}: ${selectedLibrary.value == null ? AppLocalizations.of(context)!.all : selectedLibrary.value!.name}",
+            length: 1,
+            onPressed: () async {
+              await JfxFilterListDialog.show<BaseItemDto>(
+                context,
+                enableOnlySingleSelection: true,
+                listData: allLibraries.value!,
+                selectedListData: selectedLibrary.value == null
+                    ? List<BaseItemDto>.empty()
+                    : [selectedLibrary.value!],
+                onApplyButtonClick: (list) {
+                  if (list != null && list.isNotEmpty) {
+                    selectedLibrary.value = list.first;
+                  } else {
+                    selectedLibrary.value = null;
+                  }
+                  context.pop();
+                },
+              );
+            },
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          FilterButton(
+            text:
+                "${AppLocalizations.of(context)!.genre}: ${genreFilter.value == null || genreFilter.value!.map((e) => e.name).isEmpty ? AppLocalizations.of(context)!.all : genreFilter.value!.length <= 1 ? genreFilter.value!.map((e) => e.name).join() : ""}",
+            length: genreFilter.value?.length ?? 0,
+            onPressed: () async {
+              final listData = await ref.read(apiProvider).getGenres(
+                  includeItemTypes: [
+                    BaseItemKind.movie,
+                    BaseItemKind.series,
+                    BaseItemKind.boxSet
+                  ]);
+              if (!context.mounted) return;
+              await JfxFilterListDialog.show<BaseItemDto>(context,
+                  listData: listData, selectedListData: genreFilter.value ?? [],
+                  onApplyButtonClick: (list) {
+                genreFilter.value = list;
+                context.pop(list);
+              });
+            },
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          FilterButton(
+            text:
+                "${AppLocalizations.of(context)!.filter}: ${filterType.value.map((e) => e.toString().split(".").last).isEmpty ? AppLocalizations.of(context)!.none : filterType.value.map((e) => e.toString().split(".")).length <= 1 ? filterType.value.map((e) => e.toString().split(".").last).join() : ""}",
+            length: filterType.value.map((e) => e.toString().split(".")).length,
+            onPressed: () async {
+              await JfxFilterListDialog.show<ItemFilter>(context,
+                  selectedListData: filterType.value,
+                  listData: ItemFilter.values.where((e) {
+                    return e != ItemFilter.isFolder &&
+                        e != ItemFilter.isNotFolder;
+                  }).toList(), onApplyButtonClick: (list) {
+                filterType.value = list ?? [];
+                context.pop();
+              });
+            },
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          FilterButton(
+            text:
+                "${AppLocalizations.of(context)!.sort}: ${localizeSortType(context, sortType.value)}",
+            length: 1,
+            onPressed: () {
+              if (sortType.value == ItemSortBy.sortName) {
+                sortType.value = ItemSortBy.premiereDate;
+              } else if (sortType.value == ItemSortBy.premiereDate) {
+                sortType.value = ItemSortBy.random;
+              } else if (sortType.value == ItemSortBy.random) {
+                sortType.value = ItemSortBy.sortName;
+              }
+            },
+          ),
+          const SizedBox(
+            width: 10,
+          ),
+          FilterButton(
+            text: order.value,
+            length: 1,
+            onPressed: () {
+              if (sortOrder.value == SortOrder.ascending) {
+                sortOrder.value = SortOrder.descending;
+                order.value = AppLocalizations.of(context)!.descending;
+              } else {
+                sortOrder.value = SortOrder.ascending;
+                order.value = AppLocalizations.of(context)!.ascending;
+              }
+            },
+          ),
+        ],
+      ),
+    );
+
+    final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: layout.tileWidth + (layout.tilePadding),
+        mainAxisExtent:
+            layout.tileHeight + (layout.text.headlineMedium!.fontSize! * 2),
+        crossAxisSpacing: layout.tilePadding,
+        mainAxisSpacing: layout.tilePadding);
+
+    Widget tileBuilder(BuildContext context, BaseItemDto item) {
+      return OfflineDimmed(
+        item: item,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            JfxTile(
+                id: item.id!,
+                onTap: () {
+                  context.pushNamed(ScreenPaths.library + ScreenPaths.detail,
+                      queryParameters: {
+                        "id": item.id!,
+                      });
+                },
+                blurHash: item.imageBlurHashes?.primary?.values.first),
+            const SizedBox(height: 5.0),
+            Flexible(
+              child: Text(
+                item.name!,
+                style: layout.text.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Flexible(
+              child: Text(
+                item.productionYear.toString(),
+                style: layout.text.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    void goToPage(int target) {
+      context.pushNamed(ScreenPaths.library + ScreenPaths.library,
+          queryParameters: {
+            "genreFilter": genreFilter.value?.map((e) => e.id).join(","),
+            "filterType": filterType.value
+                .map((e) => e.toString().split(".").last)
+                .join(","),
+            "sortType": sortType.value.toString().split(".").last,
+            "sortOrder": sortOrder.value.toString().split(".").last,
+            "library": selectedLibrary.value,
+            "pageNumber": target.toString(),
+          });
+    }
+
+    final itemsFuture = ref.read(apiProvider).getFilterItems(
+        parentId: selectedLibrary.value?.id,
+        genreIds: genreFilter.value,
+        startIndex: page * 100,
+        limit: 100,
+        sortOrder: [sortOrder.value],
+        sortBy: [sortType.value],
+        filters: filterType.value,
+        includeItemTypes: [
+          BaseItemKind.movie,
+          BaseItemKind.series,
+          BaseItemKind.boxSet
+        ]);
+
+    if (isCupertino(context)) {
+      return _iosLibrary(context, ref,
+          filterRow: filterRow,
+          gridDelegate: gridDelegate,
+          tileBuilder: tileBuilder,
+          itemsFuture: itemsFuture,
+          page: page,
+          goToPage: goToPage);
+    }
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -127,153 +351,7 @@ class LibraryScreen extends HookConsumerWidget {
             padding: const EdgeInsets.only(bottom: 10.0, left: 15),
             child: Align(
               alignment: Alignment.topLeft,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!((genreFilter.value == null ||
-                            genreFilter.value!.isEmpty) &&
-                        filterType.value.isEmpty &&
-                        sortOrder.value == SortOrder.ascending &&
-                        sortType.value == ItemSortBy.sortName &&
-                        selectedLibrary.value == null))
-                      TextButton(
-                          style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.resolveWith(
-                                (states) =>
-                                    Theme.of(context).secondaryHeaderColor),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.filter_list),
-                              Icon(Icons.close_outlined),
-                            ],
-                          ),
-                          onPressed: () {
-                            genreFilter.value = null;
-                            filterType.value.isEmpty;
-                            sortType.value = ItemSortBy.sortName;
-                            sortOrder.value = SortOrder.ascending;
-                            order.value =
-                                AppLocalizations.of(context)!.ascending;
-                            selectedLibrary.value = null;
-                            filterType.value = [];
-                          }),
-                    if (!((genreFilter.value == null ||
-                            genreFilter.value!.isEmpty) &&
-                        filterType.value.isEmpty &&
-                        sortOrder.value == SortOrder.ascending &&
-                        sortType.value == ItemSortBy.sortName &&
-                        selectedLibrary.value == null))
-                      const SizedBox(
-                        width: 10,
-                      ),
-                    FilterButton(
-                      text:
-                          "${AppLocalizations.of(context)!.library}: ${selectedLibrary.value == null ? AppLocalizations.of(context)!.all : selectedLibrary.value!.name}",
-                      length: 1,
-                      onPressed: () async {
-                        await JfxFilterListDialog.show<BaseItemDto>(
-                          context,
-                          enableOnlySingleSelection: true,
-                          listData: allLibraries.value!,
-                          selectedListData: selectedLibrary.value == null
-                              ? List<BaseItemDto>.empty()
-                              : [selectedLibrary.value!],
-                          onApplyButtonClick: (list) {
-                            if (list != null && list.isNotEmpty) {
-                              selectedLibrary.value = list.first;
-                            } else {
-                              selectedLibrary.value = null;
-                            }
-                            context.pop();
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(
-                      width: 10,
-                    ),
-                    FilterButton(
-                      text:
-                          "${AppLocalizations.of(context)!.genre}: ${genreFilter.value == null || genreFilter.value!.map((e) => e.name).isEmpty ? AppLocalizations.of(context)!.all : genreFilter.value!.length <= 1 ? genreFilter.value!.map((e) => e.name).join() : ""}",
-                      length: genreFilter.value?.length ?? 0,
-                      onPressed: () async {
-                        final listData = await ref.read(apiProvider).getGenres(
-                            includeItemTypes: [
-                              BaseItemKind.movie,
-                              BaseItemKind.series,
-                              BaseItemKind.boxSet
-                            ]);
-                        if (!context.mounted) return;
-                        await JfxFilterListDialog.show<BaseItemDto>(context,
-                            listData: listData,
-                            selectedListData: genreFilter.value ?? [],
-                            onApplyButtonClick: (list) {
-                          genreFilter.value = list;
-                          context.pop(list);
-                        });
-                      },
-                    ),
-                    const SizedBox(
-                      width: 10,
-                    ),
-                    FilterButton(
-                      text:
-                          "${AppLocalizations.of(context)!.filter}: ${filterType.value.map((e) => e.toString().split(".").last).isEmpty ? AppLocalizations.of(context)!.none : filterType.value.map((e) => e.toString().split(".")).length <= 1 ? filterType.value.map((e) => e.toString().split(".").last).join() : ""}",
-                      length: filterType.value
-                          .map((e) => e.toString().split("."))
-                          .length,
-                      onPressed: () async {
-                        await JfxFilterListDialog.show<ItemFilter>(context,
-                            selectedListData: filterType.value,
-                            listData: ItemFilter.values.where((e) {
-                              return e != ItemFilter.isFolder &&
-                                  e != ItemFilter.isNotFolder;
-                            }).toList(), onApplyButtonClick: (list) {
-                          filterType.value = list ?? [];
-                          context.pop();
-                        });
-                      },
-                    ),
-                    const SizedBox(
-                      width: 10,
-                    ),
-                    FilterButton(
-                      text:
-                          "${AppLocalizations.of(context)!.sort}: ${localizeSortType(context, sortType.value)}",
-                      length: 1,
-                      onPressed: () {
-                        if (sortType.value == ItemSortBy.sortName) {
-                          sortType.value = ItemSortBy.premiereDate;
-                        } else if (sortType.value == ItemSortBy.premiereDate) {
-                          sortType.value = ItemSortBy.random;
-                        } else if (sortType.value == ItemSortBy.random) {
-                          sortType.value = ItemSortBy.sortName;
-                        }
-                      },
-                    ),
-                    const SizedBox(
-                      width: 10,
-                    ),
-                    FilterButton(
-                      text: order.value,
-                      length: 1,
-                      onPressed: () {
-                        if (sortOrder.value == SortOrder.ascending) {
-                          sortOrder.value = SortOrder.descending;
-                          order.value =
-                              AppLocalizations.of(context)!.descending;
-                        } else {
-                          sortOrder.value = SortOrder.ascending;
-                          order.value = AppLocalizations.of(context)!.ascending;
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
+              child: filterRow,
             ),
           ),
         ),
@@ -288,19 +366,7 @@ class LibraryScreen extends HookConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 0.0),
               child: FutureBuilder(
-                future: ref.read(apiProvider).getFilterItems(
-                    parentId: selectedLibrary.value?.id,
-                    genreIds: genreFilter.value,
-                    startIndex: page * 100,
-                    limit: 100,
-                    sortOrder: [sortOrder.value],
-                    sortBy: [sortType.value],
-                    filters: filterType.value,
-                    includeItemTypes: [
-                      BaseItemKind.movie,
-                      BaseItemKind.series,
-                      BaseItemKind.boxSet
-                    ]),
+                future: itemsFuture,
                 builder: (context, AsyncSnapshot<List<BaseItemDto>> snapshot) {
                   List<BaseItemDto> itemsList =
                       List.filled(20, SkeletonItem.baseItemDto);
@@ -326,60 +392,10 @@ class LibraryScreen extends HookConsumerWidget {
                           child: GridView.builder(
                             padding:
                                 const EdgeInsets.only(bottom: 70.0, top: 110.0),
-                            gridDelegate:
-                                SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent:
-                                        layout.tileWidth + (layout.tilePadding),
-                                    mainAxisExtent: layout.tileHeight +
-                                        (layout.text.headlineMedium!.fontSize! *
-                                            2),
-                                    crossAxisSpacing: layout.tilePadding,
-                                    mainAxisSpacing: layout.tilePadding),
+                            gridDelegate: gridDelegate,
                             itemCount: itemsList.length,
-                            itemBuilder: (context, index) {
-                              return OfflineDimmed(
-                                item: itemsList[index],
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    JfxTile(
-                                        id: itemsList[index].id!,
-                                        onTap: () {
-                                          context.pushNamed(
-                                              ScreenPaths.library +
-                                                  ScreenPaths.detail,
-                                              queryParameters: {
-                                                "id": itemsList[index].id!,
-                                              });
-                                        },
-                                        blurHash: itemsList[index]
-                                            .imageBlurHashes
-                                            ?.primary
-                                            ?.values
-                                            .first),
-                                    const SizedBox(height: 5.0),
-                                    Flexible(
-                                      child: Text(
-                                        itemsList[index].name!,
-                                        style: layout.text.bodyMedium,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Flexible(
-                                      child: Text(
-                                        itemsList[index]
-                                            .productionYear
-                                            .toString(),
-                                        style: layout.text.bodyMedium,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                            itemBuilder: (context, index) =>
+                                tileBuilder(context, itemsList[index]),
                           ),
                         ),
                       ),
@@ -418,33 +434,7 @@ class LibraryScreen extends HookConsumerWidget {
                                 children: [
                                   if (page > 0)
                                     IconButton(
-                                      onPressed: () {
-                                        context.pushNamed(
-                                            ScreenPaths.library +
-                                                ScreenPaths.library,
-                                            queryParameters: {
-                                              "genreFilter": genreFilter.value
-                                                  ?.map((e) => e.id)
-                                                  .join(","),
-                                              "filterType": filterType.value
-                                                  .map((e) => e
-                                                      .toString()
-                                                      .split(".")
-                                                      .last)
-                                                  .join(","),
-                                              "sortType": sortType.value
-                                                  .toString()
-                                                  .split(".")
-                                                  .last,
-                                              "sortOrder": sortOrder.value
-                                                  .toString()
-                                                  .split(".")
-                                                  .last,
-                                              "library": selectedLibrary.value,
-                                              "pageNumber":
-                                                  (page - 1).toString(),
-                                            });
-                                      },
+                                      onPressed: () => goToPage(page - 1),
                                       icon: const Icon(Icons.arrow_back_ios),
                                     ),
                                   const SizedBox(
@@ -452,33 +442,7 @@ class LibraryScreen extends HookConsumerWidget {
                                   ),
                                   if (itemsList.length == 100)
                                     IconButton(
-                                      onPressed: () {
-                                        context.pushNamed(
-                                            ScreenPaths.library +
-                                                ScreenPaths.library,
-                                            queryParameters: {
-                                              "genreFilter": genreFilter.value
-                                                  ?.map((e) => e.id)
-                                                  .join(","),
-                                              "filterType": filterType.value
-                                                  .map((e) => e
-                                                      .toString()
-                                                      .split(".")
-                                                      .last)
-                                                  .join(","),
-                                              "sortType": sortType.value
-                                                  .toString()
-                                                  .split(".")
-                                                  .last,
-                                              "sortOrder": sortOrder.value
-                                                  .toString()
-                                                  .split(".")
-                                                  .last,
-                                              "library": selectedLibrary.value,
-                                              "pageNumber":
-                                                  (page + 1).toString(),
-                                            });
-                                      },
+                                      onPressed: () => goToPage(page + 1),
                                       icon: const Icon(Icons.arrow_forward_ios),
                                     ),
                                 ],
@@ -495,6 +459,85 @@ class LibraryScreen extends HookConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// iOS: a large "Library" title over the filter chips and the poster
+  /// grid, all in one scroll view, with the page arrows at the end.
+  Widget _iosLibrary(
+    BuildContext context,
+    WidgetRef ref, {
+    required Widget filterRow,
+    required SliverGridDelegate gridDelegate,
+    required Widget Function(BuildContext, BaseItemDto) tileBuilder,
+    required Future<List<BaseItemDto>> itemsFuture,
+    required int page,
+    required void Function(int) goToPage,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return FutureBuilder(
+      future: itemsFuture,
+      builder: (context, AsyncSnapshot<List<BaseItemDto>> snapshot) {
+        final items =
+            snapshot.data ?? List.filled(20, SkeletonItem.baseItemDto);
+        return IosLargeTitlePage(
+          title: l10n.library,
+          trailing: ref.watch(isOfflineProvider)
+              ? Tooltip(
+                  message: l10n.offlineLibraryNotice,
+                  triggerMode: TooltipTriggerMode.tap,
+                  child: const Icon(CupertinoIcons.cloud, size: 22),
+                )
+              : null,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 15, bottom: 12),
+                child: Align(alignment: Alignment.topLeft, child: filterRow),
+              ),
+            ),
+            if (snapshot.hasData && items.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text(l10n.noItemsFound)),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                sliver: Skeletonizer.sliver(
+                  enabled: !snapshot.hasData,
+                  child: SliverGrid.builder(
+                    gridDelegate: gridDelegate,
+                    itemCount: items.length,
+                    itemBuilder: (context, index) =>
+                        tileBuilder(context, items[index]),
+                  ),
+                ),
+              ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (page > 0)
+                      IosNavBarButton(
+                        icon: CupertinoIcons.chevron_left,
+                        onPressed: () => goToPage(page - 1),
+                      ),
+                    const SizedBox(width: 20),
+                    if (items.length == 100)
+                      IosNavBarButton(
+                        icon: CupertinoIcons.chevron_right,
+                        onPressed: () => goToPage(page + 1),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:jellyflix/components/adaptive.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -55,6 +56,84 @@ class DownloadScreen extends HookConsumerWidget {
       return null;
     }, []);
 
+    Future<void> refresh() async {
+      ref.invalidate(downloadLibraryProvider);
+      await ref.read(downloadLibraryProvider.future);
+    }
+
+    Future<void> resumeAll() async {
+      final count = await DownloadService.resumeStalledDownloads(
+          (id) => ref.read(downloadProvider(id)));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.resumedDownloadsCount(count)),
+          duration: const Duration(seconds: 2),
+        ));
+      }
+    }
+
+    final summary = library.value != null && !library.value!.isEmpty
+        ? l10n.downloadsSummary(library.value!.itemCount,
+            totalSize == null ? "…" : formatBytes(totalSize))
+        : null;
+
+    List<Widget> contents(DownloadLibrary lib) => [
+          _ActiveDownloads(library: lib),
+          if (lib.shows.isNotEmpty) ...[
+            _SectionHeader(l10n.shows),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  for (var show in lib.shows) _ShowCard(show: show),
+                ],
+              ),
+            ),
+          ],
+          if (lib.movies.isNotEmpty) ...[
+            _SectionHeader(l10n.movies),
+            for (var movie in lib.movies)
+              DownloadItemTile(
+                key: ValueKey(movie.id),
+                metadata: movie,
+                parentBranch: ScreenPaths.downloads,
+                onRemoved: () => ref.invalidate(downloadLibraryProvider),
+              ),
+          ],
+        ];
+
+    if (isCupertino(context)) {
+      return IosLargeTitlePage(
+        title: l10n.downloads,
+        subtitle: summary == null ? null : Text(summary),
+        trailing: IosNavBarButton(
+          icon: CupertinoIcons.arrow_clockwise,
+          semanticLabel: l10n.resumeAllDownloads,
+          onPressed: resumeAll,
+        ),
+        onRefresh: refresh,
+        slivers: [
+          library.when(
+            loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: AdaptiveProgressIndicator())),
+            error: (e, s) => SliverFillRemaining(
+                hasScrollBody: false, child: Center(child: Text("$e"))),
+            data: (lib) => lib.isEmpty
+                ? SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: Text(l10n.noDownloads)))
+                : SliverPadding(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    sliver: SliverList.list(children: contents(lib)),
+                  ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -62,36 +141,20 @@ class DownloadScreen extends HookConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.downloads),
-            if (library.value != null && !library.value!.isEmpty)
-              Text(
-                l10n.downloadsSummary(library.value!.itemCount,
-                    totalSize == null ? "…" : formatBytes(totalSize)),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+            if (summary != null)
+              Text(summary, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         actions: [
           IconButton(
             tooltip: l10n.resumeAllDownloads,
             icon: const Icon(Icons.restart_alt_rounded),
-            onPressed: () async {
-              final count = await DownloadService.resumeStalledDownloads(
-                  (id) => ref.read(downloadProvider(id)));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(l10n.resumedDownloadsCount(count)),
-                  duration: const Duration(seconds: 2),
-                ));
-              }
-            },
+            onPressed: resumeAll,
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(downloadLibraryProvider);
-          await ref.read(downloadLibraryProvider.future);
-        },
+        onRefresh: refresh,
         child: library.when(
           loading: () => const Center(child: AdaptiveProgressIndicator()),
           error: (e, s) => Center(child: Text("$e")),
@@ -104,32 +167,7 @@ class DownloadScreen extends HookConsumerWidget {
             }
             return ListView(
               padding: const EdgeInsets.only(bottom: 40),
-              children: [
-                _ActiveDownloads(library: lib),
-                if (lib.shows.isNotEmpty) ...[
-                  _SectionHeader(l10n.shows),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        for (var show in lib.shows) _ShowCard(show: show),
-                      ],
-                    ),
-                  ),
-                ],
-                if (lib.movies.isNotEmpty) ...[
-                  _SectionHeader(l10n.movies),
-                  for (var movie in lib.movies)
-                    DownloadItemTile(
-                      key: ValueKey(movie.id),
-                      metadata: movie,
-                      parentBranch: ScreenPaths.downloads,
-                      onRemoved: () => ref.invalidate(downloadLibraryProvider),
-                    ),
-                ],
-              ],
+              children: contents(lib),
             );
           },
         ),

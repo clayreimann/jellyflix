@@ -1,5 +1,7 @@
 import 'package:jellyflix/components/adaptive.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:jellyflix/components/settings_list.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/components/download_item_tile.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
@@ -19,38 +21,62 @@ class DownloadedShowScreen extends ConsumerWidget {
     final library = ref.watch(downloadLibraryProvider);
     final show = library.value?.show(seriesId);
 
+    Future<void> deleteAll() async {
+      for (var e in show!.episodes) {
+        final service = ref.read(downloadProvider(e.id));
+        if (service.isDownloading) {
+          await service.cancelDownload();
+        } else {
+          await service.removeDownload();
+        }
+      }
+      ref.invalidate(downloadLibraryProvider);
+      if (context.mounted) Navigator.of(context).maybePop();
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(show?.seriesName ?? ""),
-        actions: [
-          if (show != null)
-            PopupMenuButton<String>(
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: "deleteAll",
-                  child: ListTile(
-                    leading: const Icon(Icons.delete_outline_rounded),
-                    title: Text(l10n.deleteShowDownloads),
+      appBar: isCupertino(context)
+          ? adaptiveAppBar(
+              context,
+              title: Text(show?.seriesName ?? ""),
+              actions: [
+                if (show != null)
+                  IosNavBarButton(
+                    icon: CupertinoIcons.ellipsis_circle,
+                    onPressed: () async {
+                      // iOS: the menu is an action sheet; deleting is red.
+                      if (await showIosDestructiveConfirm(
+                        context: context,
+                        title: Text(show.seriesName),
+                        confirmLabel: l10n.deleteShowDownloads,
+                        cancelLabel: l10n.cancel,
+                      )) {
+                        await deleteAll();
+                      }
+                    },
                   ),
-                ),
               ],
-              onSelected: (value) async {
-                if (value == "deleteAll") {
-                  for (var e in show.episodes) {
-                    final service = ref.read(downloadProvider(e.id));
-                    if (service.isDownloading) {
-                      await service.cancelDownload();
-                    } else {
-                      await service.removeDownload();
-                    }
-                  }
-                  ref.invalidate(downloadLibraryProvider);
-                  if (context.mounted) Navigator.of(context).maybePop();
-                }
-              },
+            )
+          : AppBar(
+              title: Text(show?.seriesName ?? ""),
+              actions: [
+                if (show != null)
+                  PopupMenuButton<String>(
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: "deleteAll",
+                        child: ListTile(
+                          leading: const Icon(Icons.delete_outline_rounded),
+                          title: Text(l10n.deleteShowDownloads),
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) async {
+                      if (value == "deleteAll") await deleteAll();
+                    },
+                  ),
+              ],
             ),
-        ],
-      ),
       body: library.isLoading && show == null
           ? const Center(child: AdaptiveProgressIndicator())
           : show == null

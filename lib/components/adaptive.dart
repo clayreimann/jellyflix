@@ -197,3 +197,85 @@ class AdaptiveSearchField extends StatelessWidget {
     );
   }
 }
+
+/// An iOS page with a large title that shrinks into the nav bar as the
+/// content scrolls, an optional pull-to-refresh spinner and [children]
+/// laid out as a list.
+///
+/// Only meant for iOS; callers keep their Material layout elsewhere.
+class IosLargeTitlePage extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+
+  /// Shown under the large title, e.g. a count or a size.
+  final Widget? subtitle;
+  final Future<void> Function()? onRefresh;
+  final List<Widget> slivers;
+
+  const IosLargeTitlePage({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.subtitle,
+    this.onRefresh,
+    required this.slivers,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics()),
+        slivers: [
+          CupertinoSliverNavigationBar(
+            largeTitle: Text(title),
+            trailing: trailing,
+            border: null,
+            transitionBetweenRoutes: false,
+          ),
+          if (onRefresh != null)
+            CupertinoSliverRefreshControl(onRefresh: onRefresh),
+          if (subtitle != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                    fontSize: 15,
+                  ),
+                  child: subtitle!,
+                ),
+              ),
+            ),
+          ...slivers,
+        ],
+      ),
+    );
+  }
+}
+
+/// A borderless icon button for iOS nav bars.
+class IosNavBarButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? semanticLabel;
+
+  const IosNavBarButton({
+    super.key,
+    required this.icon,
+    this.onPressed,
+    this.semanticLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(44, 44),
+      onPressed: onPressed,
+      child: Icon(icon, semanticLabel: semanticLabel),
+    );
+  }
+}
