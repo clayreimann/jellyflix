@@ -72,6 +72,21 @@ class MyApp extends ConsumerWidget {
         theme: ThemeData(
           // iOS has no ink ripple: taps only highlight.
           splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
+          // iOS has no snackbar; show messages as a floating rounded toast
+          // above the tab bar instead of a full-width Material bar.
+          snackBarTheme: isCupertinoPlatform
+              ? SnackBarThemeData(
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: const Color(0xF02C2C2E),
+                  contentTextStyle:
+                      const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15),
+                  actionTextColor: const Color(0xFFDBEBC0),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                )
+              : null,
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: CupertinoPageTransitionsBuilder(),
