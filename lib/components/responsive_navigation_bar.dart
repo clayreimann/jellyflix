@@ -40,13 +40,18 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
       );
     }
 
+    final width = MediaQuery.of(context).size.width;
+    // iOS keeps the tab bar at every width, including an iPhone in
+    // landscape, like native iOS apps. Other platforms switch to a rail
+    // or drawer on wide screens.
+    final ios = isCupertino(context);
+
     return Scaffold(
       body: Row(
         mainAxisSize: MainAxisSize.max,
         children: [
           // Show the navigaiton rail if screen width >= 640
-          if (MediaQuery.of(context).size.width >= 640 &&
-              MediaQuery.of(context).size.width < 1100)
+          if (!ios && width >= 640 && width < 1100)
             Container(
               decoration: BoxDecoration(
                   // add elevation
@@ -134,7 +139,7 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
               ),
             ),
 
-          if (MediaQuery.of(context).size.width >= 1100)
+          if (!ios && width >= 1100)
             Container(
               decoration: BoxDecoration(
                   // add elevation
@@ -230,10 +235,10 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
           Expanded(child: navigationShell),
         ],
       ),
-      bottomNavigationBar: MediaQuery.of(context).size.width >= 640
-          ? null
-          : isCupertino(context)
-              ? _cupertinoTabBar(context, selectedIndex.value, onTabTapped)
+      bottomNavigationBar: ios
+          ? _cupertinoTabBar(context, selectedIndex.value, onTabTapped)
+          : width >= 640
+              ? null
               : BottomNavigationBar(
                   currentIndex: selectedIndex.value,
                   type: BottomNavigationBarType.fixed,
