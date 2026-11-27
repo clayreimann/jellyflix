@@ -32,6 +32,13 @@ class DownloadService {
 
   void _notifyChanged() => _changes.add(itemId);
 
+  /// Tells every listener that [id]'s download state changed.
+  static void notifyChanged(String id) => _changes.add(id);
+
+  /// Set by the download queue: whether an item is waiting for a free
+  /// download slot (it has no files or tasks yet).
+  static bool Function(String itemId) isQueued = (_) => false;
+
   final ApiService _api;
   CancelableOperation<void>? _download;
   late final String itemId;
@@ -216,6 +223,9 @@ class DownloadService {
   /// Works out whether this download is complete, actively downloading, or
   /// stalled (interrupted/failed and in need of a resume).
   Future<DownloadState> getState() async {
+    if (isQueued(itemId)) {
+      return DownloadState(DownloadStatus.queued, null);
+    }
     int? progress = await calculateProgress();
     if (progress == 100) {
       return DownloadState(DownloadStatus.complete, 100);
@@ -901,9 +911,9 @@ class DownloadService {
     var mainM3U = await _dio!
         .get(prefix + masterM3U.data.split("\n")[2], cancelToken: cancelToken);
 
+    final mainPath = "$downloadPath${Platform.pathSeparator}main.m3u8";
     // write original mainM3U to file
-    await File("$downloadPath${Platform.pathSeparator}main.m3u8")
-        .writeAsString(mainM3U.data);
+    await _writeAtomically(mainPath, mainM3U.data);
     List<String> lines = mainM3U.data.split("\n");
 
     if (Platform.isAndroid || Platform.isIOS) {
@@ -923,19 +933,54 @@ class DownloadService {
       }
     }
 
+    if (Platform.isAndroid || Platform.isIOS) {
+      // point the playlist at the local segment files, in one atomic write
+      // (it used to be rewritten once per segment, and progress checks
+      // reading it mid-write could see a truncated playlist)
+      final local = lines
+          .map((line) => line.startsWith("hls1/main")
+              ? line.split("/").last.split("?").first
+              : line)
+          .join("\n");
+      await _writeAtomically(mainPath, local);
+      return;
+    }
+
     for (var line in mainM3U.data.split("\n")) {
       if (line.startsWith("hls1/main")) {
         var fileName = line.split("/").last.split("?").first;
-        if (!Platform.isAndroid && !Platform.isIOS) {
-          await _dio!.download(
-              prefix + line, "$downloadPath${Platform.pathSeparator}$fileName",
-              cancelToken: cancelToken);
-        }
+        await _dio!.download(
+            prefix + line, "$downloadPath${Platform.pathSeparator}$fileName",
+            cancelToken: cancelToken);
         mainM3U.data = mainM3U.data.replaceFirst(line, fileName);
-        await File("$downloadPath${Platform.pathSeparator}main.m3u8")
-            .writeAsString(mainM3U.data);
+        await _writeAtomically(mainPath, mainM3U.data);
       }
     }
+  }
+
+  /// Writes via a temporary file and a rename, so readers never see a
+  /// half-written file.
+  static Future<void> _writeAtomically(String path, String contents) async {
+    final tmp = File("$path.tmp");
+    await tmp.writeAsString(contents, flush: true);
+    await tmp.rename(path);
+  }
+
+  /// Progress of an HLS download from its playlist and the segment files on
+  /// disk. Returns null if the playlist can't be read yet.
+  static int? hlsProgress(String playlist, Iterable<String> fileNames) {
+    // segment file names, whether the playlist still has server URLs or
+    // has already been rewritten to local names
+    final segments = playlist
+        .split("\n")
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith("#"))
+        .map((l) => l.split("/").last.split("?").first)
+        .toSet();
+    // an empty playlist: unknown, try again later
+    if (segments.isEmpty) return null;
+    final downloaded = fileNames.toSet().intersection(segments).length;
+    return (downloaded / segments.length * 100).floor();
   }
 
   downloadDirectStream(String streamUrl) async {
@@ -1013,35 +1058,24 @@ class DownloadService {
         await File(
                 "$downloadDirectory${Platform.pathSeparator}$itemId${Platform.pathSeparator}main.m3u8")
             .exists()) {
-      if (totalChunks == null) {
-        // read mainm3u file
-        var mainM3U = await File(
-                "$downloadDirectory${Platform.pathSeparator}$itemId${Platform.pathSeparator}main.m3u8")
-            .readAsString();
-
-        totalChunks = mainM3U
-            .split("\n")
-            .where((element) => element.startsWith("#EXTINF:"))
-            .length;
-      }
-
-      // get all files in folder
+      // Read the playlist every time. The segment count used to be cached
+      // from the first read, and a read that caught the playlist mid-write
+      // cached a wrong count for good: the row then stayed "pending" until
+      // the app was restarted.
+      var mainM3U = await File(
+              "$downloadDirectory${Platform.pathSeparator}$itemId${Platform.pathSeparator}main.m3u8")
+          .readAsString();
       var contents =
           await Directory("$downloadDirectory${Platform.pathSeparator}$itemId")
               .list()
+              .map((e) => e.path.split(Platform.pathSeparator).last)
               .toList();
-      // get all files with .ts extension
-      var downloadedChunks =
-          contents.where((element) => element.path.endsWith(".ts")).length;
-      if (totalChunks == 0) {
-        return 0;
-      } else {
-        int progress = (downloadedChunks / totalChunks! * 100).toInt();
-        if (progress == 100) {
-          await completeDownload();
-        }
-        return progress;
+      final progress = hlsProgress(mainM3U, contents);
+      if (progress == null) return 0;
+      if (progress == 100) {
+        await completeDownload();
       }
+      return progress;
     } else if (await File(
             "$downloadDirectory${Platform.pathSeparator}$itemId${Platform.pathSeparator}metadata.json")
         .exists()) {
@@ -1181,7 +1215,16 @@ class DownloadService {
   }
 }
 
-enum DownloadStatus { notDownloaded, complete, downloading, paused, failed }
+enum DownloadStatus {
+  notDownloaded,
+  complete,
+  downloading,
+  paused,
+  failed,
+
+  /// Waiting in the download queue for a free slot.
+  queued,
+}
 
 class DownloadState {
   final DownloadStatus status;

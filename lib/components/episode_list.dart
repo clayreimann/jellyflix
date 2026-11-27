@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:jellyflix/components/download_controls.dart';
 import 'package:jellyflix/components/episode_list_tile.dart';
 import 'package:jellyflix/components/jfx_text_theme.dart';
 import 'package:jellyflix/models/bitrates.dart';
@@ -10,6 +11,8 @@ import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/providers/database_provider.dart';
 import 'package:jellyflix/providers/download_provider.dart';
 import 'package:jellyflix/providers/offline_provider.dart';
+import 'package:jellyflix/services/download_queue.dart';
+import 'package:jellyflix/services/download_service.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -166,8 +169,8 @@ class EpisodeList extends HookConsumerWidget {
             BitRates.defaultBitrate();
     final List<BaseItemDto> toDownload = [];
     for (var e in episodes) {
-      final service = ref.read(downloadProvider(e.id!));
-      if (!service.isDownloading && await service.calculateProgress() == null) {
+      final state = await ref.read(downloadProvider(e.id!)).getState();
+      if (state.status == DownloadStatus.notDownloaded) {
         toDownload.add(e);
       }
     }
@@ -175,12 +178,12 @@ class EpisodeList extends HookConsumerWidget {
       content: Text(l10n.downloadingSeason(toDownload.length)),
       duration: const Duration(seconds: 2),
     ));
-    // one at a time, so the server isn't asked to start many transcodes at once
-    for (var e in toDownload) {
-      await ref
-          .read(downloadProvider(e.id!))
-          .downloadItem(downloadBitrate: downloadBitrate);
-    }
+    // the queue starts a few at a time (the simultaneous downloads setting)
+    // and the rest wait their turn
+    await queueDownload(ref, [
+      for (var e in toDownload)
+        QueuedDownload(e.id!, downloadBitrate: downloadBitrate)
+    ]);
     ref.invalidate(downloadLibraryProvider);
   }
 }

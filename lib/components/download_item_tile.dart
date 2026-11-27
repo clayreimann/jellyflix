@@ -136,6 +136,10 @@ class _StatusLine extends StatelessWidget {
         label = l10n.downloadStatusPaused(progress ?? 0);
         color = theme.colorScheme.tertiary;
         break;
+      case DownloadStatus.queued:
+        label = l10n.downloadStatusQueued;
+        color = theme.colorScheme.onSurfaceVariant;
+        break;
       default:
         label = l10n.downloadStatusWaiting;
     }
@@ -148,7 +152,9 @@ class _StatusLine extends StatelessWidget {
         SizedBox(
           width: 220,
           child: LinearProgressIndicator(
-            value: progress == null ? null : progress / 100,
+            value: state?.status == DownloadStatus.queued
+                ? 0
+                : (progress == null ? null : progress / 100),
             color: color,
             borderRadius: BorderRadius.circular(4),
           ),

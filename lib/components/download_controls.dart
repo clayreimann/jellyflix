@@ -6,6 +6,7 @@ import 'package:jellyflix/models/bitrates.dart';
 import 'package:jellyflix/providers/connectivity_provider.dart';
 import 'package:jellyflix/providers/database_provider.dart';
 import 'package:jellyflix/providers/download_provider.dart';
+import 'package:jellyflix/services/download_queue.dart';
 import 'package:jellyflix/services/download_service.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:universal_io/io.dart';
@@ -20,6 +21,7 @@ DownloadAction downloadActionFor(DownloadState? state) {
     case DownloadStatus.complete:
       return DownloadAction.remove;
     case DownloadStatus.downloading:
+    case DownloadStatus.queued:
       return DownloadAction.cancel;
     case DownloadStatus.paused:
     case DownloadStatus.failed:
@@ -107,7 +109,9 @@ Future<void> runDownloadAction(
       snack(l10n.removedDownload);
       return;
     case DownloadAction.cancel:
-      await service.cancelDownload();
+      if (!await ref.read(downloadQueueProvider).remove(itemId)) {
+        await service.cancelDownload();
+      }
       snack(l10n.canceledDownload);
       return;
     case DownloadAction.resume:
@@ -149,14 +153,27 @@ Future<void> runDownloadAction(
         (selectedSettings.$1 == null && selectedSettings.$2 == null)) {
       return;
     }
-    service.downloadItem(
-        audioStreamIndex: selectedSettings.$1,
-        subtitleStreamIndex: selectedSettings.$2,
-        downloadBitrate: downloadBitrate);
+    await queueDownload(ref, [
+      QueuedDownload(itemId,
+          audioStreamIndex: selectedSettings.$1,
+          subtitleStreamIndex: selectedSettings.$2,
+          downloadBitrate: downloadBitrate)
+    ]);
   } else {
-    service.downloadItem(downloadBitrate: downloadBitrate);
+    await queueDownload(
+        ref, [QueuedDownload(itemId, downloadBitrate: downloadBitrate)]);
   }
-  snack(l10n.startedDownload);
+  snack(ref.read(downloadQueueProvider).isWaiting(itemId)
+      ? l10n.queuedDownload
+      : l10n.startedDownload);
+}
+
+/// Adds downloads to the app's queue, which starts them as slots free up.
+/// Returns once each is either started or waiting.
+Future<void> queueDownload(WidgetRef ref, List<QueuedDownload> downloads) async {
+  final queue = ref.read(downloadQueueProvider);
+  // add them all before the first starts, so the order holds
+  await Future.wait(downloads.map(queue.add));
 }
 
 /// Round download control: a download icon, a progress ring while
@@ -198,6 +215,9 @@ class DownloadStateButton extends ConsumerWidget {
                   : Icons.play_arrow_rounded,
               size: 16),
         ]);
+        break;
+      case DownloadStatus.queued:
+        icon = Icon(Icons.schedule_rounded, color: color);
         break;
       default:
         icon = const Icon(Icons.file_download_outlined);

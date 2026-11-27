@@ -154,12 +154,23 @@ class _ActiveDownloads extends ConsumerWidget {
           state.status != DownloadStatus.complete &&
           state.status != DownloadStatus.notDownloaded;
     }).toList();
-    if (active.isEmpty) return const SizedBox.shrink();
+    final waiting = ref.watch(downloadQueueWaitingProvider).value ?? 0;
+    if (active.isEmpty && waiting == 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(
-            "${AppLocalizations.of(context)!.downloadingHeader} (${active.length})"),
+        _SectionHeader("${l10n.downloadingHeader} (${active.length})"),
+        if (waiting > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(children: [
+              const Icon(Icons.schedule_rounded, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.downloadsWaiting(waiting),
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ]),
+          ),
         for (var m in active)
           DownloadItemTile(
             key: ValueKey("active-${m.id}"),

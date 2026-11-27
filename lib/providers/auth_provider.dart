@@ -7,6 +7,7 @@ import 'package:tentacle/tentacle.dart';
 import 'package:jellyflix/models/user.dart';
 import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/providers/database_provider.dart';
+import 'package:jellyflix/providers/download_provider.dart';
 import 'package:jellyflix/providers/connectivity_provider.dart';
 import 'package:jellyflix/services/download_service.dart';
 import 'package:jellyflix/providers/logger_provider.dart';
@@ -44,13 +45,16 @@ final updateServerReachableProvider =
       // copy of the library in the background.
       // (this provider is auto-disposed, so don't use ref in the callbacks)
       final connectivity = ref.read(connectivityProvider);
+      final queue = ref.read(downloadQueueProvider);
       DownloadService.resumeStalledDownloads((id) => DownloadService(api,
               itemId: id, connectivityService: connectivity, logger: logger))
           .then((count) => logger.verbose("Downloads: auto-resumed $count"))
           .catchError((e) {
         logger.error("Downloads: auto-resume failed", error: e);
         return 0;
-      });
+      })
+          // then start whatever was still waiting in the queue
+          .whenComplete(queue.pump);
       api.syncOfflineLibrary().then((_) async {
         // keep posters for the whole library so it looks right offline
         final cache = api.offlineCache;

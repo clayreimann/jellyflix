@@ -4,8 +4,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/models/download_metadata.dart';
 import 'package:jellyflix/providers/api_provider.dart';
 import 'package:jellyflix/providers/connectivity_provider.dart';
+import 'package:jellyflix/providers/database_provider.dart';
 import 'package:jellyflix/providers/logger_provider.dart';
+import 'package:jellyflix/services/download_queue.dart';
 import 'package:jellyflix/services/download_service.dart';
+import 'package:universal_io/io.dart';
 
 final downloadProvider = Provider.family<DownloadService, String>(
     (ref, itemId) => DownloadService(ref.read(apiProvider),
@@ -13,12 +16,80 @@ final downloadProvider = Provider.family<DownloadService, String>(
         connectivityService: ref.read(connectivityProvider),
         logger: ref.read(loggerProvider)));
 
+/// How many downloads transfer at once unless the user picks otherwise.
+const defaultMaxConcurrentDownloads = 5;
+
+/// Settings key for the simultaneous downloads limit.
+const maxConcurrentDownloadsKey = "maxConcurrentDownloads";
+
+/// The app-wide download queue. Every new download goes through it, so at
+/// most the configured number transfer at once and the rest wait their turn.
+final downloadQueueProvider = Provider<DownloadQueue>((ref) {
+  final settings = ref.read(databaseProvider("settings"));
+  bool stillTransferring(DownloadState s) =>
+      s.status == DownloadStatus.downloading;
+  final queue = DownloadQueue(
+    start: (d) {
+      if (ref.read(apiProvider).offline) {
+        throw StateError("offline: download stays queued");
+      }
+      return ref.read(downloadProvider(d.itemId)).downloadItem(
+        downloadBitrate: d.downloadBitrate,
+        audioStreamIndex: d.audioStreamIndex,
+        subtitleStreamIndex: d.subtitleStreamIndex);
+    },
+    isDone: (id) async =>
+        !stillTransferring(await ref.read(downloadProvider(id)).getState()),
+    maxConcurrent: () =>
+        settings.get(maxConcurrentDownloadsKey) ??
+        defaultMaxConcurrentDownloads,
+    storage: () async => File(
+        "${await DownloadService.getDownloadDirectory()}${Platform.pathSeparator}_queue.json"),
+    onChanged: DownloadService.notifyChanged,
+    restoreActive: () async {
+      final active = <String>[];
+      for (var id in await DownloadService.getDownloadedItems()) {
+        try {
+          if (stillTransferring(
+              await ref.read(downloadProvider(id)).getState())) {
+            active.add(id);
+          }
+        } catch (_) {}
+      }
+      return active;
+    },
+  );
+  DownloadService.isQueued = queue.isWaiting;
+  ref.onDispose(() {
+    queue.dispose();
+    DownloadService.isQueued = (_) => false;
+  });
+  return queue;
+});
+
+/// How many downloads are waiting for a free slot. Updates live.
+final downloadQueueWaitingProvider = StreamProvider.autoDispose<int>((ref) {
+  final queue = ref.watch(downloadQueueProvider);
+  final controller = StreamController<int>();
+  controller.add(queue.waitingCount);
+  final sub = DownloadService.changes
+      .listen((_) => controller.add(queue.waitingCount));
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+  return controller.stream.distinct();
+});
+
 final getDownloadsProvider = Provider.autoDispose<Future<List<String>>>(
     (ref) => DownloadService.getDownloadedItems());
 
-final cancelAndDeleteDownloadProvider = Provider(
-  (ref) => DownloadService.cancelAndDeleteAllDownloads(),
-);
+/// Cancels and deletes every download, including ones still queued.
+final cancelAndDeleteDownloadProvider =
+    Provider<Future<void> Function()>((ref) => () async {
+          await ref.read(downloadQueueProvider).clear();
+          await DownloadService.cancelAndDeleteAllDownloads();
+        });
 
 final downloadProgressProvider = StreamProvider.autoDispose
     .family<int?, String>((ref, itemId) =>

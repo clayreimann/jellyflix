@@ -274,5 +274,15 @@
         }
     },
     "downloadingHeader": "Downloading",
-    "removeDownload": "Remove Download"
+    "removeDownload": "Remove Download",
+    "queuedDownload": "Queued Download",
+    "downloadStatusQueued": "Queued",
+    "downloadsWaiting": "{count, plural, =1{1 more waiting to start} other{{count} more waiting to start}}",
+    "@downloadsWaiting": {
+        "placeholders": {
+            "count": {"type": "int"}
+        }
+    },
+    "simultaneousDownloads": "Simultaneous downloads",
+    "simultaneousDownloadsText": "How many downloads transfer at once. The rest wait in a queue and start as earlier ones finish."
 }
