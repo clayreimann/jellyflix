@@ -199,6 +199,7 @@ class LibraryScreen extends HookConsumerWidget {
             text:
                 "${AppLocalizations.of(context)!.sort}: ${localizeSortType(context, sortType.value)}",
             length: 1,
+            opensList: false,
             onPressed: () {
               if (sortType.value == ItemSortBy.sortName) {
                 sortType.value = ItemSortBy.premiereDate;
@@ -215,6 +216,7 @@ class LibraryScreen extends HookConsumerWidget {
           FilterButton(
             text: order.value,
             length: 1,
+            opensList: false,
             onPressed: () {
               if (sortOrder.value == SortOrder.ascending) {
                 sortOrder.value = SortOrder.descending;
@@ -264,7 +266,7 @@ class LibraryScreen extends HookConsumerWidget {
             ),
             Flexible(
               child: Text(
-                item.productionYear.toString(),
+                item.productionYear?.toString() ?? '',
                 style: layout.text.bodyMedium,
               ),
             ),

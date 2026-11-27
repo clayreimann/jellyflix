@@ -120,7 +120,7 @@ class HomeScreen extends HookConsumerWidget {
                     e.imageBlurHashes?.primary?.values.first,
                 titleMapping: (e) => e.name!,
                 subtitleMapping: (e) =>
-                    e.productionYear == null ? "" : e.productionYear.toString(),
+                    e.productionYear?.toString() ?? "",
                 title: AppLocalizations.of(context)!.continueWatching,
                 overlay: (int index, BaseItemDto element) =>
                     PlaybackProgressOverlay(
@@ -153,7 +153,7 @@ class HomeScreen extends HookConsumerWidget {
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 posterType: PosterType.vertical,
               ),
             ),
@@ -180,7 +180,7 @@ class HomeScreen extends HookConsumerWidget {
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 posterType: PosterType.vertical,
               ),
             ),
@@ -193,7 +193,7 @@ class HomeScreen extends HookConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 10.0),
                 child: PaginatedItemCarousel(
                   titleMapping: (e) => e.name!,
-                  subtitleMapping: (e) => e.productionYear.toString(),
+                  subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                   imageMapping: (e) => e.id!,
                   blurHashMapping: (e) =>
                       e.imageBlurHashes?.primary?.values.first,
@@ -222,7 +222,7 @@ class HomeScreen extends HookConsumerWidget {
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
                 future: ref.read(apiProvider).getTopTenPopular(),
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 title: AppLocalizations.of(context)!.top10inYourLibrary,
                 overlay: (index, element) => Positioned(
                     child: Padding(
@@ -248,7 +248,7 @@ class HomeScreen extends HookConsumerWidget {
               child: PaginatedItemCarousel(
                 title: AppLocalizations.of(context)!.similarToWatchHistory,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 imageMapping: (e) => e.id!,
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
@@ -267,7 +267,7 @@ class HomeScreen extends HookConsumerWidget {
               child: PaginatedItemCarousel(
                 title: AppLocalizations.of(context)!.highesRatedMovies,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 imageMapping: (e) => e.id!,
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
@@ -292,7 +292,7 @@ class HomeScreen extends HookConsumerWidget {
               child: PaginatedItemCarousel(
                 title: AppLocalizations.of(context)!.highestRatedShows,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 imageMapping: (e) => e.id!,
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
@@ -317,7 +317,7 @@ class HomeScreen extends HookConsumerWidget {
               child: PaginatedItemCarousel(
                 title: AppLocalizations.of(context)!.moviesMaybeMissed,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 imageMapping: (e) => e.id!,
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
@@ -343,7 +343,7 @@ class HomeScreen extends HookConsumerWidget {
               child: PaginatedItemCarousel(
                 title: AppLocalizations.of(context)!.showsMaybeMissed,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) => e.productionYear.toString(),
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 imageMapping: (e) => e.id!,
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,

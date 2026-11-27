@@ -102,7 +102,7 @@ class ImageBannerInnerLandscape extends HookConsumerWidget {
                                     .headlineSmall,
                                 maxLines: 2,
                               ),
-                              Text(items[index].productionYear.toString(),
+                              Text(items[index].productionYear?.toString() ?? "",
                                   style: JfxTextTheme.scalingTheme(context)
                                       .titleMedium),
                               const SizedBox(

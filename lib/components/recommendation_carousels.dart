@@ -61,7 +61,7 @@ class RecommendationCarousels extends HookConsumerWidget {
                     titleList: data[index].items!.map((e) => e.name!).toList(),
                     subtitleList: data[index]
                         .items!
-                        .map((e) => e.productionYear.toString())
+                        .map((e) => e.productionYear?.toString() ?? "")
                         .toList(),
                     title: buildTitleString(data[index]),
                     onTap: (carouselIndex) {
