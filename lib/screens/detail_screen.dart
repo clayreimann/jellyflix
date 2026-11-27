@@ -174,24 +174,18 @@ class DetailScreen extends HookConsumerWidget {
                       SizedBox(
                         height: headerHeight,
                         child: Stack(
+                          // iOS: the artwork stretches above the header on
+                          // a pull-down.
+                          clipBehavior: Clip.none,
                           children: [
-                            if (ios) ...[
-                              // The edge colour behind the nav bar...
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                height: barBottom + 1,
-                                child: ColoredBox(
-                                    color: edgeColor ??
-                                        Theme.of(context).colorScheme.surface),
-                              ),
-                            ],
-                            Positioned.fill(
-                              top: ios ? barBottom : 0,
-                              child: Stack(
-                                children: [
-                                  JellyfinImage(
+                            if (ios)
+                              Positioned.fill(
+                                child: _StretchyBackdrop(
+                                  scrollController: scrollController,
+                                  barBottom: barBottom,
+                                  edgeColor: edgeColor ??
+                                      Theme.of(context).colorScheme.surface,
+                                  image: JellyfinImage(
                                       borderRadius: BorderRadius.zero,
                                       id: data.type == BaseItemKind.episode
                                           ? data.seriesId!
@@ -199,48 +193,37 @@ class DetailScreen extends HookConsumerWidget {
                                       type: ImageType.backdrop,
                                       blurHash: data
                                           .imageBlurHashes?.backdrop?[itemId]),
-                                  // ...blending down into the artwork's top.
-                                  if (ios && edgeColor != null)
-                                    Positioned(
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      height: 28,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [
-                                              edgeColor,
-                                              edgeColor.withValues(alpha: 0),
-                                            ],
-                                          ),
+                                ),
+                              )
+                            else
+                              Positioned.fill(
+                                child: Stack(
+                                  children: [
+                                    JellyfinImage(
+                                        borderRadius: BorderRadius.zero,
+                                        id: data.type == BaseItemKind.episode
+                                            ? data.seriesId!
+                                            : itemId,
+                                        type: ImageType.backdrop,
+                                        blurHash: data.imageBlurHashes
+                                            ?.backdrop?[itemId]),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            const Color.fromARGB(100, 0, 0, 0),
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .surface
+                                          ],
                                         ),
                                       ),
                                     ),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        // iOS keeps the artwork's top clear
-                                        // (it's below the bar now) and only
-                                        // fades its bottom into the page.
-                                        stops: ios ? const [0.45, 1.0] : null,
-                                        colors: [
-                                          ios
-                                              ? const Color(0x00000000)
-                                              : const Color.fromARGB(
-                                                  100, 0, 0, 0),
-                                          Theme.of(context).colorScheme.surface
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -264,106 +247,126 @@ class DetailScreen extends HookConsumerWidget {
                                   ),
                                 ),
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment
-                                        .end, // Align text to the bottom
-                                    children: [
-                                      Text(
-                                        data.name ?? "",
-                                        style:
-                                            layout.text.headlineSmall!.copyWith(
-                                          fontWeight: FontWeight.bold,
+                                  // iOS: a soft page-coloured halo behind
+                                  // the title and details, so they read
+                                  // on any artwork.
+                                  child: DefaultTextStyle.merge(
+                                    style: ios
+                                        ? TextStyle(shadows: [
+                                            for (final r in const [4.0, 12.0])
+                                              Shadow(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .surface,
+                                                blurRadius: r,
+                                              ),
+                                          ])
+                                        : null,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment
+                                          .end, // Align text to the bottom
+                                      children: [
+                                        Text(
+                                          data.name ?? "",
+                                          style: layout.text.headlineSmall!
+                                              .copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 8.0),
-                                      Row(
-                                        children: [
-                                          Text(
-                                              data.premiereDate?.year == null
-                                                  ? AppLocalizations.of(
-                                                          context)!
-                                                      .na
-                                                  : data.premiereDate!.year
-                                                      .toString(),
-                                              style: layout.text.bodyLarge),
-                                          const SizedBox(width: 16.0),
-                                          Container(
-                                            decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(10.0),
-                                                border: Border.all(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurface,
-                                                  width: 0.7,
-                                                )),
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.all(3.0),
-                                              child: Text(
-                                                data.officialRating ??
-                                                    AppLocalizations.of(
+                                        const SizedBox(height: 8.0),
+                                        Row(
+                                          children: [
+                                            Text(
+                                                data.premiereDate?.year == null
+                                                    ? AppLocalizations.of(
                                                             context)!
-                                                        .na,
-                                                style: layout.text.bodySmall,
+                                                        .na
+                                                    : data.premiereDate!.year
+                                                        .toString(),
+                                                style: layout.text.bodyLarge),
+                                            const SizedBox(width: 16.0),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          10.0),
+                                                  border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface,
+                                                    width: 0.7,
+                                                  )),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(3.0),
+                                                child: Text(
+                                                  data.officialRating ??
+                                                      AppLocalizations.of(
+                                                              context)!
+                                                          .na,
+                                                  style: layout.text.bodySmall,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4.0),
-                                      Row(
-                                        children: [
-                                          data.communityRating == null
-                                              ? const SizedBox()
-                                              : Row(
-                                                  children: [
-                                                    const Text(
-                                                      "⭐",
-                                                      style: TextStyle(
-                                                          fontSize: 20),
-                                                    ),
-                                                    const SizedBox(width: 4.0),
-                                                    Text(
-                                                      (data.communityRating ==
-                                                              null)
-                                                          ? AppLocalizations.of(
-                                                                  context)!
-                                                              .na
-                                                          : data
-                                                              .communityRating!
-                                                              .roundToDouble()
-                                                              .toString(),
-                                                      style:
-                                                          layout.text.bodySmall,
-                                                    ),
-                                                  ],
-                                                ),
-                                          const SizedBox(width: 16.0),
-                                          data.criticRating == null
-                                              ? const SizedBox()
-                                              : Row(
-                                                  children: [
-                                                    const Text(
-                                                      "🍅",
-                                                      style: TextStyle(
-                                                          fontSize: 20),
-                                                    ),
-                                                    const SizedBox(width: 4.0),
-                                                    Text(
-                                                      data.criticRating!
-                                                          .round()
-                                                          .toString(),
-                                                      style:
-                                                          layout.text.bodySmall,
-                                                    ),
-                                                  ],
-                                                ),
-                                        ],
-                                      ),
-                                    ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4.0),
+                                        Row(
+                                          children: [
+                                            data.communityRating == null
+                                                ? const SizedBox()
+                                                : Row(
+                                                    children: [
+                                                      const Text(
+                                                        "⭐",
+                                                        style: TextStyle(
+                                                            fontSize: 20),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 4.0),
+                                                      Text(
+                                                        (data.communityRating ==
+                                                                null)
+                                                            ? AppLocalizations
+                                                                    .of(
+                                                                        context)!
+                                                                .na
+                                                            : data
+                                                                .communityRating!
+                                                                .roundToDouble()
+                                                                .toString(),
+                                                        style: layout
+                                                            .text.bodySmall,
+                                                      ),
+                                                    ],
+                                                  ),
+                                            const SizedBox(width: 16.0),
+                                            data.criticRating == null
+                                                ? const SizedBox()
+                                                : Row(
+                                                    children: [
+                                                      const Text(
+                                                        "🍅",
+                                                        style: TextStyle(
+                                                            fontSize: 20),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 4.0),
+                                                      Text(
+                                                        data.criticRating!
+                                                            .round()
+                                                            .toString(),
+                                                        style: layout
+                                                            .text.bodySmall,
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -623,5 +626,89 @@ class DetailScreen extends HookConsumerWidget {
           },
           extra: playerHelper);
     }
+  }
+}
+
+/// iOS detail header artwork, the Apple TV way: the image runs up behind
+/// the nav bar, fading at the very top into its own edge colour, and on a
+/// pull-down it stays pinned to the top of the screen and grows, with that
+/// colour continuing above it, so no blank page shows through. Its bottom
+/// fades into the page.
+class _StretchyBackdrop extends StatelessWidget {
+  final ScrollController scrollController;
+  final double barBottom;
+  final Color edgeColor;
+  final Widget image;
+
+  const _StretchyBackdrop({
+    required this.scrollController,
+    required this.barBottom,
+    required this.edgeColor,
+    required this.image,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return LayoutBuilder(builder: (context, constraints) {
+      final height = constraints.maxHeight;
+      return AnimatedBuilder(
+        animation: scrollController,
+        builder: (context, _) {
+          final offset =
+              scrollController.hasClients ? scrollController.offset : 0.0;
+          final stretch = offset < 0 ? -offset : 0.0;
+          final total = height + stretch;
+          // The fade at the top covers the status and nav bar area.
+          final topFade =
+              ((barBottom * 0.85 + stretch) / total).clamp(0.0, 1.0);
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Edge colour well above the header, for big pulls.
+              Positioned(
+                top: -stretch - 2000,
+                left: 0,
+                right: 0,
+                height: 2000.5,
+                child: ColoredBox(color: edgeColor),
+              ),
+              Positioned(
+                top: -stretch,
+                left: 0,
+                right: 0,
+                height: total,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    image,
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: [0, topFade],
+                          colors: [edgeColor, edgeColor.withValues(alpha: 0)],
+                        ),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: const [0.5, 1.0],
+                          colors: [surface.withValues(alpha: 0), surface],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    });
   }
 }
