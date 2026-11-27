@@ -35,9 +35,11 @@ class SwitchSettingsTile extends StatelessWidget {
                         color: Theme.of(context).colorScheme.primary, size: 24),
                     child: leading!,
                   ),
-        title: title,
+        title: iosWrappingTitle(title),
         trailing: AdaptiveSwitch(value: value, onChanged: onChanged),
-        onTap: onChanged == null ? null : () => onChanged!(!value),
+        // Like the Settings app, a switch row has no tap highlight; only the
+        // switch toggles. (A row tap awaited onChanged, so a slow server
+        // call left the row highlighted.)
       );
     }
     return ListTile(

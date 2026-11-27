@@ -15,9 +15,19 @@ class UseEpisodeImagesNotifier extends AsyncNotifier<bool> {
     return ref.read(apiProvider).getUseEpisodeImagesInNextUpAndResume();
   }
 
+  /// Flips the switch at once, then saves to the server. If the save
+  /// fails (e.g. offline), the switch goes back.
   Future<void> toggle(bool value) async {
-    await ref.read(apiProvider).setUseEpisodeImagesInNextUpAndResume(value);
+    final previous = state;
     state = AsyncData(value);
+    try {
+      await ref
+          .read(apiProvider)
+          .setUseEpisodeImagesInNextUpAndResume(value)
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      state = previous;
+    }
   }
 }
 

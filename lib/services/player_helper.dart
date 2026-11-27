@@ -200,8 +200,12 @@ class PlayerHelper {
   List<Widget> getTopButtonBarThemeData(
       BuildContext context, GlobalKey<VideoState> key,
       {required String title}) {
+    // The controls float over video, so they stay light-on-dark whatever
+    // the app's theme. (In light mode they otherwise picked up dark text.)
+    const overlayText = TextStyle(color: Colors.white);
     return [
       BackButton(
+        color: Colors.white,
         onPressed: () async {
           try {
             await backButtonPressed().timeout(const Duration(seconds: 2));
@@ -224,17 +228,22 @@ class PlayerHelper {
         },
       ),
       const SizedBox(width: 10),
-      Text(title),
-      const Spacer(),
+      Expanded(
+        child: Text(title,
+            style: overlayText, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      const SizedBox(width: 10),
       StreamBuilder(
         stream: player.stream.position,
         builder: (context, snapshot) {
-          return Text(AppLocalizations.of(context)!.ends(
-              intl.DateFormat("HH:mm").format(DateTime.now()
-                  .add(Duration(
-                      minutes: player.state.duration.inMinutes -
-                          player.state.position.inMinutes))
-                  .toLocal())));
+          return Text(
+              AppLocalizations.of(context)!.ends(intl.DateFormat("HH:mm")
+                  .format(DateTime.now()
+                      .add(Duration(
+                          minutes: player.state.duration.inMinutes -
+                              player.state.position.inMinutes))
+                      .toLocal())),
+              style: overlayText);
         },
       )
     ];

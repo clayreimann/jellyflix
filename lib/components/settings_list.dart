@@ -81,9 +81,9 @@ class SettingsTile extends StatelessWidget {
           icon: iosIcon ?? icon,
           color: destructive ? red : iosColor,
         ),
-        title: destructive
+        title: iosWrappingTitle(destructive
             ? DefaultTextStyle.merge(style: TextStyle(color: red), child: title)
-            : title,
+            : title),
         additionalInfo: value,
         trailing:
             control ?? (opensMore ? const CupertinoListTileChevron() : null),
@@ -98,6 +98,23 @@ class SettingsTile extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+/// Lets an iOS list-row title wrap onto more lines, as Settings does with
+/// long labels and large Dynamic Type sizes, instead of the one truncated
+/// line [CupertinoListTile] uses by default.
+Widget iosWrappingTitle(Widget title) {
+  return Builder(
+    builder: (context) => DefaultTextStyle(
+      style: DefaultTextStyle.of(context).style,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 4, 8, 4),
+        child: title,
+      ),
+    ),
+  );
 }
 
 /// The iOS Settings-app icon: a white glyph on a small coloured rounded

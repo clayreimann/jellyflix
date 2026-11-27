@@ -1,6 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/components/adaptive.dart';
+import 'package:jellyflix/components/ios_tab_bar.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -232,7 +233,14 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
           // Main content
           // This part is always shown
           // You will see it on both small and wide screen
-          Expanded(child: navigationShell),
+          Expanded(
+            child: ios
+                // In landscape the notch or Dynamic Island sits on one side.
+                // Keep every page's content clear of it (lists don't do
+                // this on their own). The bars handle top and bottom.
+                ? SafeArea(top: false, bottom: false, child: navigationShell)
+                : navigationShell,
+          ),
         ],
       ),
       bottomNavigationBar: ios
@@ -274,29 +282,21 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
   Widget _cupertinoTabBar(
       BuildContext context, int currentIndex, ValueChanged<int> onTap) {
     final l10n = AppLocalizations.of(context)!;
-    return CupertinoTabBar(
+    // Filled glyphs for every tab, as iOS tab bars use; the selected one
+    // only changes tint.
+    return IosTabBar(
       currentIndex: currentIndex,
       onTap: onTap,
       activeColor: Theme.of(context).colorScheme.primary,
       items: [
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.house),
-            activeIcon: const Icon(CupertinoIcons.house_fill),
-            label: l10n.home),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.search), label: l10n.search),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.arrow_down_circle),
-            activeIcon: const Icon(CupertinoIcons.arrow_down_circle_fill),
-            label: l10n.downloads),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.rectangle_stack),
-            activeIcon: const Icon(CupertinoIcons.rectangle_stack_fill),
-            label: l10n.library),
-        BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.person_crop_circle),
-            activeIcon: const Icon(CupertinoIcons.person_crop_circle_fill),
-            label: l10n.profile),
+        IosTabItem(icon: CupertinoIcons.house_fill, label: l10n.home),
+        IosTabItem(icon: CupertinoIcons.search, label: l10n.search),
+        IosTabItem(
+            icon: CupertinoIcons.arrow_down_to_line, label: l10n.downloads),
+        IosTabItem(
+            icon: CupertinoIcons.rectangle_stack_fill, label: l10n.library),
+        IosTabItem(
+            icon: CupertinoIcons.person_crop_circle_fill, label: l10n.profile),
       ],
     );
   }
