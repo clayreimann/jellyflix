@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/services/player_helper.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:tentacle/tentacle.dart';

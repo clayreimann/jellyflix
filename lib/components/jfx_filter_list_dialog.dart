@@ -1,5 +1,8 @@
 import 'package:filter_list/filter_list.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+// filter_list still takes types from the deprecated in-SDK Material library.
+// ignore: deprecated_member_use
+import 'package:flutter/material.dart' as legacy show OutlineInputBorder;
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:tentacle/tentacle.dart';
 
@@ -84,7 +87,8 @@ class JfxFilterListDialog<T extends Object> {
                   closeIconColor: Theme.of(context).iconTheme.color!,
                   searchFieldHintText: AppLocalizations.of(context)!.search,
                   searchFieldInputBorder: // empty border fixes layout issue
-                      const OutlineInputBorder(borderSide: BorderSide.none),
+                      const legacy.OutlineInputBorder(
+                          borderSide: BorderSide.none),
                 ),
                 controlButtonBarTheme: ControlButtonBarThemeData(
                   context,
