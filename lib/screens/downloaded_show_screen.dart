@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/components/download_item_tile.dart';
@@ -51,7 +52,7 @@ class DownloadedShowScreen extends ConsumerWidget {
         ],
       ),
       body: library.isLoading && show == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AdaptiveProgressIndicator())
           : show == null
               ? Center(child: Text(l10n.noDownloads))
               : ListView(

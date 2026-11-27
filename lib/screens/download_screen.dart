@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -92,7 +93,7 @@ class DownloadScreen extends HookConsumerWidget {
           await ref.read(downloadLibraryProvider.future);
         },
         child: library.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: AdaptiveProgressIndicator()),
           error: (e, s) => Center(child: Text("$e")),
           data: (lib) {
             if (lib.isEmpty) {
