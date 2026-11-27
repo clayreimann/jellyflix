@@ -8,6 +8,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:jellyflix/providers/router_provider.dart';
 import 'package:jellyflix/providers/scaffold_key.dart';
 import 'package:jellyflix/services/database_service.dart';
@@ -65,6 +66,23 @@ class MyApp extends ConsumerWidget {
             MaterialUiCompatibilityBridge(child: child!),
         title: "Jellyflix",
         theme: ThemeData(
+          // iOS has no ink ripple: taps only highlight.
+          splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
+          // iOS has no snackbar; show messages as a floating rounded toast
+          // above the tab bar instead of a full-width Material bar.
+          snackBarTheme: isCupertinoPlatform
+              ? SnackBarThemeData(
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: const Color(0xF02C2C2E),
+                  contentTextStyle:
+                      const TextStyle(color: Color(0xFFFFFFFF), fontSize: 15),
+                  actionTextColor: const Color(0xFFDBEBC0),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                )
+              : null,
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -76,6 +94,16 @@ class MyApp extends ConsumerWidget {
               primary: const Color(0xFFDBEBC0),
               brightness: Brightness.dark),
           useMaterial3: true,
+          // iOS only: Cupertino widgets (tab bar, nav bars, lists) use the
+          // app's accent and iOS's dark bar colours. Android never builds
+          // Cupertino widgets, so this has no effect there.
+          cupertinoOverrideTheme: isCupertinoPlatform
+              ? const CupertinoThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: Color(0xFFDBEBC0),
+                  barBackgroundColor: Color(0xF01D1D1D),
+                )
+              : null,
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:dots_indicator/dots_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -141,7 +142,7 @@ class ImageBannerInnerLandscape extends HookConsumerWidget {
                                       ? const SizedBox(
                                           width: 10,
                                           height: 10,
-                                          child: CircularProgressIndicator(),
+                                          child: AdaptiveProgressIndicator(),
                                         )
                                       : const SizedBox(
                                           width: 10,

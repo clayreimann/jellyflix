@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -80,7 +81,7 @@ class ProfileSelectionScreen extends HookConsumerWidget {
               )
             ],
           ),
-          loading: () => const CircularProgressIndicator(),
+          loading: () => const AdaptiveProgressIndicator(),
         ),
       ),
     );
