@@ -88,10 +88,12 @@ class _PlayerSreenState extends ConsumerState<PlayerScreen> {
           if (completed) {
             await playbackHelper.completedPlayback();
             await defaultExitNativeFullscreen();
-            if (key.currentState?.isFullscreen() ?? false) {
+            final wasFullscreen = key.currentState?.isFullscreen() ?? false;
+            if (wasFullscreen) {
               await key.currentState?.exitFullscreen();
             }
-            if (mounted) {
+            // On phones onExitFullscreen already popped the player page.
+            if ((!wasFullscreen || UniversalPlatform.isDesktop) && mounted) {
               context.pop();
             }
           }

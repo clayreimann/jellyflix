@@ -208,11 +208,17 @@ class PlayerHelper {
           } catch (e) {
             logger.error("Player: Couldn't report playback finished");
           }
-          if (UniversalPlatform.isDesktop &&
-              (key.currentState?.isFullscreen() ?? false)) {
+          // On phones the player always runs in media_kit's fullscreen
+          // route, which sits on the root navigator above the player page.
+          // Leaving fullscreen pops that route, and the player screen's
+          // onExitFullscreen then pops the player page itself, so popping
+          // here as well would also pop the page the user came from.
+          final wasFullscreen = key.currentState?.isFullscreen() ?? false;
+          if (wasFullscreen) {
             await key.currentState?.exitFullscreen();
           }
-          if (context.mounted) {
+          if ((!wasFullscreen || UniversalPlatform.isDesktop) &&
+              context.mounted) {
             context.pop();
           }
         },
