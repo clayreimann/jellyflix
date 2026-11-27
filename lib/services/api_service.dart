@@ -1,3 +1,4 @@
+import 'package:jellyflix/services/locks.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -77,7 +78,14 @@ class ApiService {
 
   /// Downloads metadata for every library (movies, shows, episodes) into the
   /// offline cache. Skipped if a sync happened recently unless [force].
-  Future<void> syncOfflineLibrary({bool force = false}) async {
+  final SingleFlight<void> _syncing = SingleFlight();
+
+  /// Only one sync runs at a time; asking again while one is running waits
+  /// for it instead of fetching the whole library twice.
+  Future<void> syncOfflineLibrary({bool force = false}) =>
+      _syncing.run(() => _syncOfflineLibrary(force: force));
+
+  Future<void> _syncOfflineLibrary({bool force = false}) async {
     if (offline || _user == null || _jellyfinApi == null) return;
     final cache = offlineCache!;
     await cache.ensureLoaded();

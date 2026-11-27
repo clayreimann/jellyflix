@@ -19,6 +19,7 @@ import 'package:jellyflix/navigation/app_router.dart';
 import 'package:jellyflix/providers/scaffold_key.dart';
 import 'package:jellyflix/services/api_service.dart';
 import 'package:jellyflix/services/connectivity_service.dart';
+import 'package:jellyflix/services/locks.dart';
 
 class DownloadService {
   static final Map<String, DownloadService> _instances = {};
@@ -34,6 +35,18 @@ class DownloadService {
 
   /// Tells every listener that [id]'s download state changed.
   static void notifyChanged(String id) => _changes.add(id);
+
+  /// One lock per item: starting, resuming, canceling and removing a
+  /// download (and rewriting its metadata) each take several awaited steps
+  /// on the same folder and background tasks, and must not interleave. For
+  /// example an automatic resume on login racing a tap on Resume used to
+  /// enqueue every missing segment twice.
+  static final KeyedLocks _locks = KeyedLocks();
+  Future<T> _locked<T>(Future<T> Function() body) =>
+      _locks.run(itemId, body);
+
+  final SingleFlight<void> _completing = SingleFlight();
+  static final SingleFlight<int> _resumingAll = SingleFlight();
 
   /// Set by the download queue: whether an item is waiting for a free
   /// download slot (it has no files or tasks yet).
@@ -157,7 +170,16 @@ class DownloadService {
   /// metadata (title, description, season). Used to repair downloads whose
   /// metadata was incomplete, so they browse nicely offline.
   Future<void> refreshMetadata() async {
+    // a background tidy-up: don't queue behind a download being set up,
+    // the next refresh will get it
+    if (_locks.isLocked(itemId)) return;
+    return _locked(_refreshMetadata);
+  }
+
+  Future<void> _refreshMetadata() async {
     if (_dio == null || _api.currentUser == null) return;
+    // removed while this was waiting its turn
+    if (!await _hasFolder()) return;
     var metadata = await getMetadata();
     BaseItemDto details = await _api.getItemDetails(itemId);
     metadata.name = details.name ?? metadata.name;
@@ -175,6 +197,10 @@ class DownloadService {
     }
   }
 
+  Future<bool> _hasFolder() async => Directory(
+          "${await getDownloadDirectory()}${Platform.pathSeparator}$itemId")
+      .exists();
+
   Future<void> _writeMetadata(DownloadMetadata metadata) async {
     var downloadDirectory = await getDownloadDirectory();
     var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
@@ -182,8 +208,9 @@ class DownloadService {
     if (metadata.path != null) {
       json["Path"] = toStoredPath(metadata.path!, downloadDirectory);
     }
-    await File("$downloadPath${Platform.pathSeparator}metadata.json")
-        .writeAsString(jsonEncode(json));
+    await _writeAtomically(
+        "$downloadPath${Platform.pathSeparator}metadata.json",
+        jsonEncode(json));
   }
 
   Future<void> _downloadItemImage(String imagePath) async {
@@ -259,6 +286,11 @@ class DownloadService {
   /// Resumes every download that isn't complete and isn't currently
   /// downloading. Called when the app starts or the server becomes reachable.
   static Future<int> resumeStalledDownloads(
+          DownloadService Function(String itemId) serviceFor) =>
+      // login and the Downloads screen can both ask at once
+      _resumingAll.run(() => _resumeStalledDownloads(serviceFor));
+
+  static Future<int> _resumeStalledDownloads(
       DownloadService Function(String itemId) serviceFor) async {
     int resumed = 0;
     for (var id in await getDownloadedItems()) {
@@ -299,12 +331,14 @@ class DownloadService {
       {int? audioStreamIndex,
       int? subtitleStreamIndex,
       required int downloadBitrate}) {
+    final token = cancelToken;
     final operation = CancelableOperation.fromFuture(
-      _downloadItem(
-        audioStreamIndex: audioStreamIndex,
-        subtitleStreamIndex: subtitleStreamIndex,
-        downloadBitrate: downloadBitrate,
-      ),
+      _locked(() => _downloadItem(
+            audioStreamIndex: audioStreamIndex,
+            subtitleStreamIndex: subtitleStreamIndex,
+            downloadBitrate: downloadBitrate,
+            token: token,
+          )),
       onCancel: () {
         isDownloading = false;
         logger.warning("Downloads: Download canceled");
@@ -323,7 +357,15 @@ class DownloadService {
   Future<void> _downloadItem(
       {int? audioStreamIndex,
       int? subtitleStreamIndex,
-      required int downloadBitrate}) async {
+      required int downloadBitrate,
+      required CancelToken token}) async {
+    // canceled while waiting for the lock or between steps: stop, so a
+    // canceled download can't recreate its folder or enqueue tasks
+    void checkCanceled() {
+      if (token.isCancelled) throw StateError("download canceled");
+    }
+
+    checkCanceled();
     isDownloading = true;
     PlaybackInfoResponse playbackInfo = await _api.getPlaybackInfo(
         itemId: itemId,
@@ -332,8 +374,10 @@ class DownloadService {
         subtitleStreamIndex: subtitleStreamIndex);
     logger.verbose("Downloads: PlaybackInfo: $playbackInfo");
 
+    checkCanceled();
     String streamUrl = _api.getStreamUrl(playbackInfo);
     await writeMetadataToFile(playbackInfo, streamUrl);
+    checkCanceled();
 
     logger.verbose("Downloads: Stream URL: $streamUrl");
 
@@ -347,6 +391,7 @@ class DownloadService {
       subtitle = helper.subtitles
           .firstWhere((element) => element.index == subtitleStreamIndex);
       subtitlePath = await downloadSubtitle(subtitle);
+      checkCanceled();
     }
 
     logger.verbose("Downloads: Subtitle downloaded to path: $subtitlePath");
@@ -354,14 +399,17 @@ class DownloadService {
     if (playbackInfo.mediaSources![0].transcodingUrl == null) {
       await writePlaybackInfoToFile(playbackInfo,
           subtitle: subtitle, subtitlePath: subtitlePath);
+      checkCanceled();
       await downloadDirectStream(streamUrl);
     } else {
       await writePlaybackInfoToFile(playbackInfo,
           subtitle: subtitle,
           subtitlePath: subtitlePath,
           audioStreamIndex: audioStreamIndex);
+      checkCanceled();
       await downloadTranscodedStream(
-          playbackInfo.mediaSources![0].transcodingUrl!);
+          playbackInfo.mediaSources![0].transcodingUrl!,
+          token: token);
     }
   }
 
@@ -439,8 +487,9 @@ class DownloadService {
         .toJson();
 
     // write metadata to file
-    await File("$downloadPath${Platform.pathSeparator}metadata.json")
-        .writeAsString(jsonEncode(metadata));
+    await _writeAtomically(
+        "$downloadPath${Platform.pathSeparator}metadata.json",
+        jsonEncode(metadata));
     _notifyChanged();
 
     // download backdrop image
@@ -503,8 +552,9 @@ class DownloadService {
     });
 
     // write playback info to file
-    await File("$downloadPath${Platform.pathSeparator}playback_info.json")
-        .writeAsString(PlaybackInfoResponseSerializer.toJson(updatedInfo));
+    await _writeAtomically(
+        "$downloadPath${Platform.pathSeparator}playback_info.json",
+        PlaybackInfoResponseSerializer.toJson(updatedInfo));
   }
 
   Future<PlaybackInfoResponse> getPlaybackInfoFromFile() async {
@@ -567,6 +617,10 @@ class DownloadService {
   }
 
   Future<void> resumeDownload(
+          {bool onlyStalled = false, bool silent = false}) =>
+      _locked(() => _resumeDownload(onlyStalled: onlyStalled, silent: silent));
+
+  Future<void> _resumeDownload(
       {bool onlyStalled = false, bool silent = false}) async {
     _notifyChanged();
     // Resume download
@@ -590,6 +644,9 @@ class DownloadService {
               "Downloads: Error resuming download: $itemId: $stackTrace",
               error: error);
         });
+      // re-enqueueing is quick; finish it while holding the lock, so two
+      // resumes can't both enqueue the same missing segments
+      await _download!.valueOrCancellation().catchError((_) => null);
     } else if (masterM3UExists && mainM3UExists) {
       isDownloading = true;
       _download = CancelableOperation.fromFuture(
@@ -621,7 +678,7 @@ class DownloadService {
               error: error);
         });
     } else if (!silent) {
-      await removeDownload();
+      await _removeDownload();
       rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
           content: Text(AppLocalizations.of(navigatorKey.currentContext!)!
               .couldNotResumeDownload)));
@@ -787,7 +844,9 @@ class DownloadService {
     }
   }
 
-  Future<void> removeDownload() async {
+  Future<void> removeDownload() => _locked(_removeDownload);
+
+  Future<void> _removeDownload() async {
     for (var task in await _tasksForItem()) {
       await FlutterDownloader.remove(taskId: task.taskId);
     }
@@ -893,7 +952,9 @@ class DownloadService {
     return path;
   }
 
-  Future<void> downloadTranscodedStream(String streamUrl) async {
+  Future<void> downloadTranscodedStream(String streamUrl,
+      {CancelToken? token}) async {
+    final cancelToken = token ?? this.cancelToken;
     var downloadDirectory = await getDownloadDirectory();
     var downloadPath = "$downloadDirectory${Platform.pathSeparator}$itemId";
 
@@ -904,8 +965,8 @@ class DownloadService {
       await Directory(downloadPath).create(recursive: true);
     }
     var masterM3U = await _dio!.get(streamUrl, cancelToken: cancelToken);
-    await File("$downloadPath${Platform.pathSeparator}master.m3u8")
-        .writeAsString(masterM3U.data);
+    await _writeAtomically(
+        "$downloadPath${Platform.pathSeparator}master.m3u8", masterM3U.data);
     var prefix =
         "${streamUrl.split("/").sublist(0, streamUrl.split("/").length - 1).join("/")}/";
     var mainM3U = await _dio!
@@ -920,6 +981,9 @@ class DownloadService {
       // get document directory
       for (var line in lines) {
         if (line.startsWith("hls1/main")) {
+          if (cancelToken.isCancelled) {
+            throw StateError("download canceled");
+          }
           var fileName = line.split("/").last.split("?").first;
           var taskId = await FlutterDownloader.enqueue(
             url: _api.currentUser!.serverAdress! + prefix + line,
@@ -960,8 +1024,10 @@ class DownloadService {
 
   /// Writes via a temporary file and a rename, so readers never see a
   /// half-written file.
+  static int _tmpCounter = 0;
   static Future<void> _writeAtomically(String path, String contents) async {
-    final tmp = File("$path.tmp");
+    // a unique temporary name, so two writers never share one
+    final tmp = File("$path.${_tmpCounter++}.tmp");
     await tmp.writeAsString(contents, flush: true);
     await tmp.rename(path);
   }
@@ -983,7 +1049,13 @@ class DownloadService {
     return (downloaded / segments.length * 100).floor();
   }
 
-  downloadDirectStream(String streamUrl) async {
+  Future<void> downloadDirectStream(String streamUrl) async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      // only enqueues a background task: do it inside the setup (and its
+      // lock) rather than in the background
+      await _cancelableDownloadDirectStream(streamUrl);
+      return;
+    }
     _download = CancelableOperation.fromFuture(
       _cancelableDownloadDirectStream(streamUrl),
       onCancel: () {
@@ -1023,9 +1095,9 @@ class DownloadService {
       var localFile = File(localFilePath);
 
       // write temp_download_data to file
-      await File("$downloadPath${Platform.pathSeparator}temp_download_data")
-          .writeAsString(
-              "$streamUrl\n$contentLength\n${toStoredPath(localFile.path, await getDownloadDirectory())}");
+      await _writeAtomically(
+          "$downloadPath${Platform.pathSeparator}temp_download_data",
+          "$streamUrl\n$contentLength\n${toStoredPath(localFile.path, await getDownloadDirectory())}");
 
       var tempFile = File("$downloadPath${Platform.pathSeparator}temp_chunk0");
 
@@ -1142,7 +1214,12 @@ class DownloadService {
     return null;
   }
 
-  Future<void> completeDownload() async {
+  /// Every progress check of a finished download lands here, often several
+  /// at once (each screen showing it, the queue), so overlapping calls
+  /// share one run.
+  Future<void> completeDownload() => _completing.run(_completeDownload);
+
+  Future<void> _completeDownload() async {
     isDownloading = false;
     if (Platform.isAndroid || Platform.isIOS) {
       // Only clean up this item's finished tasks. Removing every finished
@@ -1166,7 +1243,17 @@ class DownloadService {
     }
   }
 
-  Future<void> cancelDownload() async {
+  Future<void> cancelDownload() {
+    // Stop a setup in progress right away (it checks the token between
+    // steps), then clean up once it has let go of the lock. Downloads
+    // started after this point get a fresh token.
+    final token = cancelToken;
+    cancelToken = CancelToken();
+    token.cancel();
+    return _locked(_cancelDownload);
+  }
+
+  Future<void> _cancelDownload() async {
     isDownloading = false;
     if (Platform.isAndroid || Platform.isIOS) {
       for (var taskId in downloadTaskIds) {
@@ -1178,12 +1265,9 @@ class DownloadService {
       }
       downloadTaskIds = [];
     }
-    // cancel the latest request
-    cancelToken.cancel();
     // cancel the future
     await _download?.cancel();
-    await removeDownload();
-    cancelToken = CancelToken();
+    await _removeDownload();
     try {
       await _api.reportStopPlayback(0, itemId: itemId);
     } catch (_) {
@@ -1198,7 +1282,8 @@ class DownloadService {
         await FlutterDownloader.remove(taskId: task.taskId);
       }
     }
-    for (DownloadService instance in _instances.values) {
+    // a copy: the map can grow while this awaits
+    for (DownloadService instance in _instances.values.toList()) {
       await instance.cancelDownload();
     }
     // delete all downloads

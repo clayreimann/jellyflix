@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:jellyflix/services/download_service.dart';
+import 'package:jellyflix/services/locks.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:universal_io/io.dart';
@@ -87,18 +88,28 @@ class OfflineLibraryCache {
     _saveTimer = Timer(const Duration(seconds: 2), save);
   }
 
-  Future<void> save() async {
+  final AsyncLock _saveLock = AsyncLock();
+
+  /// Saves one at a time: the timer and the end of a sync can both save,
+  /// and two writers sharing the temporary file could corrupt it.
+  Future<void> save() {
     _saveTimer?.cancel();
+    return _saveLock.run(_save);
+  }
+
+  Future<void> _save() async {
     if (!_loaded) return;
     final file = await _file();
-    final tmp = File("${file.path}.tmp");
-    await tmp.writeAsString(jsonEncode({
+    // encoded in one go, before any await, so it's a consistent snapshot
+    final contents = jsonEncode({
       "folders": _folderIds,
       "items": _items,
       "episodes": _episodesBySeries,
       "libraries": _itemsByLibrary,
       "syncedAt": syncedAt?.toIso8601String(),
-    }));
+    });
+    final tmp = File("${file.path}.tmp");
+    await tmp.writeAsString(contents, flush: true);
     await tmp.rename(file.path);
   }
 

@@ -12,6 +12,7 @@ import 'package:jellyflix/providers/connectivity_provider.dart';
 import 'package:jellyflix/services/download_service.dart';
 import 'package:jellyflix/providers/logger_provider.dart';
 import 'package:jellyflix/services/auth_service.dart';
+import 'package:jellyflix/services/locks.dart';
 
 final authProvider = Provider<AuthService>((ref) {
   final apiService = ref.read(apiProvider);
@@ -25,8 +26,15 @@ final StateProvider authStateProvider = StateProvider<AuthState?>((ref) {
   return null;
 });
 
-final updateServerReachableProvider =
-    FutureProvider.autoDispose<void>((ref) async {
+/// The router starts this check on every navigation. Runs that overlapped
+/// could each see "not logged in yet" and each run the just-logged-in work
+/// (resume downloads, sync the library), so a run in progress is shared.
+final _reachabilityCheck = SingleFlight<void>();
+
+final updateServerReachableProvider = FutureProvider.autoDispose<void>(
+    (ref) => _reachabilityCheck.run(() => _updateServerReachable(ref)));
+
+Future<void> _updateServerReachable(Ref ref) async {
   var logger = ref.read(loggerProvider);
   final authService = ref.read(authProvider);
   bool? serverReachable = await authService.checkServerReachable();
@@ -97,7 +105,7 @@ final updateServerReachableProvider =
     logger.verbose(
         "Auth: Server reachability is unknown and AuthState is unknown");
   }
-});
+}
 
 final authStateStreamControllerProvider =
     StateProvider<StreamController<AuthState>>(
