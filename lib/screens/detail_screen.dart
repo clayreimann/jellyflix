@@ -1,4 +1,5 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:jellyflix/components/adaptive.dart';
 import 'dart:async';
 import 'dart:ui';
@@ -68,7 +69,14 @@ class DetailScreen extends HookConsumerWidget {
     // (and its episodes) on every rebuild, including each time the bar
     // changed while scrolling.
     final details = useMemoized(() => _loadDetails(ref), [itemId]);
-    final title = useFuture(details).data?.name;
+    final loaded = useFuture(details).data;
+    final title = loaded?.name;
+    final backdropHash =
+        loaded?.imageBlurHashes?.backdrop?.values.firstOrNull ??
+            loaded?.imageBlurHashes?.primary?.values.firstOrNull;
+    final edgeColor = useFuture(
+      useMemoized(() => _topEdgeColor(backdropHash), [backdropHash]),
+    ).data;
 
     useEffect(() {
       listener() {
@@ -105,8 +113,8 @@ class DetailScreen extends HookConsumerWidget {
               // Rebuilds only the bar on scroll, not the page.
               child: ValueListenableBuilder<double>(
                 valueListenable: barProgress,
-                builder: (context, progress, _) =>
-                    _iosBar(context, progress: progress, title: title),
+                builder: (context, progress, _) => _iosBar(context,
+                    progress: progress, title: title, edgeColor: edgeColor),
               ),
             )
           : appBarColorTransaparent.value
@@ -167,29 +175,71 @@ class DetailScreen extends HookConsumerWidget {
                         height: headerHeight,
                         child: Stack(
                           children: [
-                            Stack(
-                              children: [
-                                JellyfinImage(
-                                    borderRadius: BorderRadius.zero,
-                                    id: data.type == BaseItemKind.episode
-                                        ? data.seriesId!
-                                        : itemId,
-                                    type: ImageType.backdrop,
-                                    blurHash: data
-                                        .imageBlurHashes?.backdrop?[itemId]),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        const Color.fromARGB(100, 0, 0, 0),
-                                        Theme.of(context).colorScheme.surface
-                                      ],
+                            if (ios) ...[
+                              // The edge colour behind the nav bar...
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: barBottom + 1,
+                                child: ColoredBox(
+                                    color: edgeColor ??
+                                        Theme.of(context).colorScheme.surface),
+                              ),
+                            ],
+                            Positioned.fill(
+                              top: ios ? barBottom : 0,
+                              child: Stack(
+                                children: [
+                                  JellyfinImage(
+                                      borderRadius: BorderRadius.zero,
+                                      id: data.type == BaseItemKind.episode
+                                          ? data.seriesId!
+                                          : itemId,
+                                      type: ImageType.backdrop,
+                                      blurHash: data
+                                          .imageBlurHashes?.backdrop?[itemId]),
+                                  // ...blending down into the artwork's top.
+                                  if (ios && edgeColor != null)
+                                    Positioned(
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      height: 28,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              edgeColor,
+                                              edgeColor.withValues(alpha: 0),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        // iOS keeps the artwork's top clear
+                                        // (it's below the bar now) and only
+                                        // fades its bottom into the page.
+                                        stops: ios ? const [0.45, 1.0] : null,
+                                        colors: [
+                                          ios
+                                              ? const Color(0x00000000)
+                                              : const Color.fromARGB(
+                                                  100, 0, 0, 0),
+                                          Theme.of(context).colorScheme.surface
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
@@ -460,35 +510,41 @@ class DetailScreen extends HookConsumerWidget {
   /// At 1: the system bar material and hairline, the item's name, and a
   /// plain tinted chevron. In between, everything crossfades.
   Widget _iosBar(BuildContext context,
-      {required double progress, String? title}) {
+      {required double progress, String? title, Color? edgeColor}) {
     final chrome = CupertinoDynamicColor.resolve(iosChromeColor, context);
     final tint = CupertinoTheme.of(context).primaryColor;
     return CupertinoNavigationBar(
       transitionBetweenRoutes: false,
+      // Status bar text that reads on the artwork's colour, then on the
+      // bar once it's solid.
+      brightness: progress < 0.5 && edgeColor != null
+          ? (edgeColor.computeLuminance() > 0.5
+              ? Brightness.light
+              : Brightness.dark)
+          : null,
       automaticBackgroundVisibility: false,
       backgroundColor: chrome.withValues(alpha: chrome.a * progress),
       border: Border(
           bottom: BorderSide(
               color: const Color(0x4D000000).withValues(alpha: 0.3 * progress),
               width: 0.0)),
-      leading: Align(
-        alignment: Alignment.centerLeft,
-        child: CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(32, 32),
-          onPressed: () => Navigator.maybePop(context),
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: const Color(0xFF000000)
-                  .withValues(alpha: 0.4 * (1 - progress)),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(CupertinoIcons.chevron_left,
-                color: Color.lerp(const Color(0xFFFFFFFF), tint, progress),
-                size: 18 + 4 * progress),
+      // Not wrapped in an Align: that stretched the leading slot across
+      // the bar and squeezed the title to nothing.
+      leading: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(32, 32),
+        onPressed: () => Navigator.maybePop(context),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color:
+                const Color(0xFF000000).withValues(alpha: 0.4 * (1 - progress)),
+            shape: BoxShape.circle,
           ),
+          child: Icon(CupertinoIcons.chevron_left,
+              color: Color.lerp(const Color(0xFFFFFFFF), tint, progress),
+              size: 18 + 4 * progress),
         ),
       ),
       middle: Opacity(
@@ -496,6 +552,26 @@ class DetailScreen extends HookConsumerWidget {
         child: Text(title ?? '', overflow: TextOverflow.ellipsis),
       ),
     );
+  }
+
+  /// The average colour along the top edge of an image, from its blur
+  /// hash, to extend the artwork up behind the nav bar.
+  static Future<Color?> _topEdgeColor(String? blurHash) async {
+    if (blurHash == null) return null;
+    try {
+      const w = 16;
+      final pixels =
+          await blurHashDecode(blurHash: blurHash, width: w, height: 8);
+      var r = 0, g = 0, b = 0;
+      for (var x = 0; x < w; x++) {
+        r += pixels[x * 4];
+        g += pixels[x * 4 + 1];
+        b += pixels[x * 4 + 2];
+      }
+      return Color.fromARGB(255, r ~/ w, g ~/ w, b ~/ w);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Item details, falling back to what's known from downloads when the
