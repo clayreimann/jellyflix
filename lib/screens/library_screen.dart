@@ -386,10 +386,6 @@ class LibraryScreen extends HookConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.only(left: 10.0, right: 10.0),
                         child: Skeletonizer(
-                          effect: ShimmerEffect(
-                            baseColor: Colors.grey.withValues(alpha: 0.5),
-                            highlightColor: Colors.white.withValues(alpha: 0.5),
-                          ),
                           enabled: !snapshot.hasData,
                           child: GridView.builder(
                             padding:

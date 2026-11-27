@@ -22,7 +22,7 @@ class NavigationDrawerTile extends StatelessWidget {
         child: Material(
           color: selected
               ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.05),
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
           //color: Theme.of(context).navigationRailTheme.indicatorColor,
           borderRadius: BorderRadius.circular(15),
           child: InkWell(

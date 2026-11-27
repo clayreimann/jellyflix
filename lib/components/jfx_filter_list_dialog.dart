@@ -113,8 +113,10 @@ class JfxFilterListDialog<T extends Object> {
                 wrapAlignment: WrapAlignment.center,
                 choiceChipTheme: ChoiceChipThemeData(
                   backgroundColor: Theme.of(context).focusColor,
-                  selectedTextStyle: const TextStyle(color: Colors.white),
-                  textStyle: const TextStyle(color: Colors.white),
+                  selectedTextStyle:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  textStyle:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   margin: const EdgeInsets.symmetric(
                       horizontal: 5.0, vertical: 5.0),
                 ),

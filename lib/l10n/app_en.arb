@@ -286,5 +286,9 @@
     "simultaneousDownloads": "Simultaneous downloads",
     "simultaneousDownloadsText": "How many downloads transfer at once. The rest wait in a queue and start as earlier ones finish.",
     "copyCode": "Copy code",
-    "codeCopied": "Code copied"
+    "codeCopied": "Code copied",
+    "appearance": "Appearance",
+    "appearanceSystem": "System",
+    "appearanceLight": "Light",
+    "appearanceDark": "Dark"
 }

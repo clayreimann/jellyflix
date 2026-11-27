@@ -123,36 +123,77 @@ class SettingsIconBadge extends StatelessWidget {
   }
 }
 
-/// On iOS, asks the user to pick one of [options] in an action sheet and
-/// returns the picked value, or null on Cancel. The current value is ticked.
-Future<T?> showIosChoiceSheet<T>({
+/// On iOS, pushes a Settings-style choice list (labels on the left, a
+/// checkmark on the right of the current value) and returns the picked
+/// value, or null if the user goes back without picking.
+Future<T?> showIosChoicePicker<T>({
   required BuildContext context,
-  required Widget title,
-  Widget? message,
+  required String title,
+  String? footer,
   required Map<T, String> options,
   T? selected,
-  required String cancelLabel,
 }) {
-  return showCupertinoModalPopup<T>(
-    context: context,
-    builder: (context) => CupertinoActionSheet(
-      title: title,
-      message: message,
-      actions: [
-        for (final entry in options.entries)
-          CupertinoActionSheetAction(
-            isDefaultAction: entry.key == selected,
-            onPressed: () => Navigator.pop(context, entry.key),
-            child:
-                Text(entry.key == selected ? '${entry.value}  ✓' : entry.value),
-          ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        onPressed: () => Navigator.pop(context),
-        child: Text(cancelLabel),
+  return Navigator.of(context).push<T>(
+    CupertinoPageRoute(
+      builder: (context) => _IosChoiceList<T>(
+        title: title,
+        footer: footer,
+        options: options,
+        selected: selected,
       ),
     ),
   );
+}
+
+class _IosChoiceList<T> extends StatelessWidget {
+  final String title;
+  final String? footer;
+  final Map<T, String> options;
+  final T? selected;
+
+  const _IosChoiceList({
+    super.key,
+    required this.title,
+    required this.footer,
+    required this.options,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: CupertinoNavigationBar(
+        middle: Text(title),
+        transitionBetweenRoutes: false,
+      ),
+      body: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            backgroundColor: const Color(0x00000000),
+            hasLeading: false,
+            footer: footer == null
+                ? null
+                : Text(footer!,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: CupertinoColors.secondaryLabel
+                            .resolveFrom(context))),
+            children: [
+              for (final entry in options.entries)
+                CupertinoListTile(
+                  title: Text(entry.value),
+                  trailing: entry.key == selected
+                      ? Icon(CupertinoIcons.check_mark,
+                          color: CupertinoTheme.of(context).primaryColor)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(entry.key),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// On iOS, asks to confirm a destructive action in an action sheet with a

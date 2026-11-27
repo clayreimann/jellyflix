@@ -20,6 +20,7 @@ import 'package:jellyflix/providers/database_provider.dart';
 import 'package:jellyflix/providers/device_info_provider.dart';
 import 'package:jellyflix/providers/download_provider.dart';
 import 'package:jellyflix/providers/logger_provider.dart';
+import 'package:jellyflix/providers/theme_mode_provider.dart';
 
 class ProfileScreen extends HookConsumerWidget {
   const ProfileScreen({super.key});
@@ -146,13 +147,12 @@ class ProfileScreen extends HookConsumerWidget {
                 // show dialog
                 final l10n = AppLocalizations.of(context)!;
                 var result = ios
-                    ? await showIosChoiceSheet<int>(
+                    ? await showIosChoicePicker<int>(
                         context: context,
-                        title: Text(l10n.setLocalDownloadBitrate),
-                        message: Text(l10n.maxDownloadBitrateText),
+                        title: l10n.setLocalDownloadBitrate,
+                        footer: l10n.maxDownloadBitrateText,
                         options: BitRates().map,
                         selected: downloadBitrate.value,
-                        cancelLabel: l10n.cancel,
                       )
                     : await showDialog(
                         context: context,
@@ -178,17 +178,16 @@ class ProfileScreen extends HookConsumerWidget {
               onTap: () async {
                 final l10n = AppLocalizations.of(context)!;
                 final int? result = ios
-                    ? await showIosChoiceSheet<int>(
+                    ? await showIosChoicePicker<int>(
                         context: context,
-                        title: Text(l10n.simultaneousDownloads),
-                        message: Text(l10n.simultaneousDownloadsText),
+                        title: l10n.simultaneousDownloads,
+                        footer: l10n.simultaneousDownloadsText,
                         options: {
                           for (final option
                               in _SimultaneousDownloadsDialog.options)
                             option: option.toString()
                         },
                         selected: maxConcurrentDownloads.value,
-                        cancelLabel: l10n.cancel,
                       )
                     : await showDialog<int>(
                         context: context,
@@ -249,6 +248,53 @@ class ProfileScreen extends HookConsumerWidget {
         if (!ios) const SizedBox(height: 20),
         SettingsSection(
           children: [
+            SettingsTile(
+              icon: Icons.brightness_6_outlined,
+              iosIcon: CupertinoIcons.circle_lefthalf_fill,
+              iosColor: CupertinoColors.systemBlue,
+              title: Text(AppLocalizations.of(context)!.appearance),
+              value:
+                  Text(_themeModeLabel(context, ref.watch(themeModeProvider))),
+              opensMore: true,
+              onTap: () async {
+                final l10n = AppLocalizations.of(context)!;
+                final options = {
+                  for (final mode in [
+                    ThemeMode.system,
+                    ThemeMode.light,
+                    ThemeMode.dark
+                  ])
+                    mode: _themeModeLabel(context, mode)
+                };
+                final current = ref.read(themeModeProvider);
+                final ThemeMode? result = ios
+                    ? await showIosChoicePicker<ThemeMode>(
+                        context: context,
+                        title: l10n.appearance,
+                        options: options,
+                        selected: current,
+                      )
+                    : await showDialog<ThemeMode>(
+                        context: context,
+                        builder: (context) => SimpleDialog(
+                          title: Text(l10n.appearance),
+                          children: [
+                            for (final entry in options.entries)
+                              ListTile(
+                                leading: Icon(entry.key == current
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked),
+                                title: Text(entry.value),
+                                onTap: () => Navigator.pop(context, entry.key),
+                              ),
+                          ],
+                        ),
+                      );
+                if (result != null) {
+                  await ref.read(themeModeProvider.notifier).set(result);
+                }
+              },
+            ),
             SwitchSettingsTile(
               leading: const Icon(Icons.image_outlined),
               iosIcon: CupertinoIcons.photo_fill,
@@ -469,5 +515,17 @@ class _SimultaneousDownloadsDialog extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+String _themeModeLabel(BuildContext context, ThemeMode mode) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (mode) {
+    case ThemeMode.light:
+      return l10n.appearanceLight;
+    case ThemeMode.dark:
+      return l10n.appearanceDark;
+    case ThemeMode.system:
+      return l10n.appearanceSystem;
   }
 }

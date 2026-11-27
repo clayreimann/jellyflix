@@ -45,19 +45,18 @@ void main() {
     });
   }
 
-  testWidgets('iOS choice sheet returns the picked value', (tester) async {
+  testWidgets('iOS choice list returns the picked value', (tester) async {
     int? picked;
     await tester.pumpWidget(_app(
         TargetPlatform.iOS,
         Builder(
           builder: (context) => TextButton(
             onPressed: () async {
-              picked = await showIosChoiceSheet<int>(
+              picked = await showIosChoicePicker<int>(
                 context: context,
-                title: const Text('Bitrate'),
+                title: 'Bitrate',
                 options: const {1: 'One', 2: 'Two'},
                 selected: 1,
-                cancelLabel: 'Cancel',
               );
             },
             child: const Text('open'),
@@ -65,8 +64,9 @@ void main() {
         )));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.byType(CupertinoActionSheet), findsOneWidget);
-    expect(find.text('One  ✓'), findsOneWidget);
+    expect(find.byType(CupertinoListTile), findsNWidgets(2));
+    // the tick sits at the end of the current row only
+    expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
     await tester.tap(find.text('Two'));
     await tester.pumpAndSettle();
     expect(picked, 2);
