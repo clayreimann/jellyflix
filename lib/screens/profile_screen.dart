@@ -8,6 +8,7 @@ import 'package:jellyflix/components/mpv_config_dialog.dart';
 import 'package:jellyflix/components/profile_image.dart';
 import 'package:jellyflix/components/quick_connect_dialog.dart';
 import 'package:jellyflix/components/set_download_bitrate_dialog.dart';
+import 'package:jellyflix/components/ios_sheets.dart';
 import 'package:jellyflix/components/settings_list.dart';
 import 'package:jellyflix/components/switch_settings_tile.dart';
 import 'package:jellyflix/models/bitrates.dart';
@@ -108,7 +109,7 @@ class ProfileScreen extends HookConsumerWidget {
               iosColor: CupertinoColors.systemBlue,
               title: Text(AppLocalizations.of(context)!.quickConnect),
               onTap: () {
-                showDialog(
+                showAdaptivePlatformDialog(
                     context: context,
                     builder: (context) => const QuickConnectDialog());
               },
@@ -232,12 +233,19 @@ class ProfileScreen extends HookConsumerWidget {
             iosIcon: CupertinoIcons.slider_horizontal_3,
             title: Text(AppLocalizations.of(context)!.customMpvConfig),
             onTap: () async {
-              final result = await showDialog<String>(
-                context: context,
-                builder: (context) => MpvConfigDialog(
-                  mpvConfig: mpvConfig.value,
-                ),
-              );
+              final result = ios
+                  ? await Navigator.of(context, rootNavigator: true)
+                      .push<String>(CupertinoPageRoute(
+                      fullscreenDialog: true,
+                      builder: (context) =>
+                          MpvConfigDialog(mpvConfig: mpvConfig.value),
+                    ))
+                  : await showDialog<String>(
+                      context: context,
+                      builder: (context) => MpvConfigDialog(
+                        mpvConfig: mpvConfig.value,
+                      ),
+                    );
               if (result != null) {
                 mpvConfig.value = result;
                 ref.read(databaseProvider("settings")).put("mpvConfig", result);
@@ -372,7 +380,13 @@ class ProfileScreen extends HookConsumerWidget {
               title: Text(AppLocalizations.of(context)!.showPrimaryForEpisodes),
               value: useEpisodeImagesAsync.valueOrNull ?? false,
               onChanged: (value) async {
-                await ref.read(useEpisodeImagesProvider.notifier).toggle(value);
+                try {
+                  await ref
+                      .read(useEpisodeImagesProvider.notifier)
+                      .toggle(value);
+                } catch (e) {
+                  if (context.mounted) await showSaveFailedAlert(context, e);
+                }
               },
             ),
           ],

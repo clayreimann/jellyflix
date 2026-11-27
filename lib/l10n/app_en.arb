@@ -290,5 +290,14 @@
     "appearance": "Appearance",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "done": "Done",
+    "settingNotSaved": "Couldn't Save Setting",
+    "settingNotSavedText": "The server didn't accept the change, so the setting is unchanged.",
+    "serverSaid": "Server response: {detail}",
+    "@serverSaid": {
+        "placeholders": {
+            "detail": {"type": "String"}
+        }
+    }
 }

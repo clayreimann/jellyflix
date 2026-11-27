@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/providers/api_provider.dart';
@@ -52,6 +53,17 @@ class JellyfinImage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // While loading, draw one plain rounded block that the skeleton paints
+    // as a bone. Loading the placeholder's image or blur hash here made
+    // the block change look (light, then a dark blur) as it decoded.
+    if (Skeletonizer.maybeOf(context)?.enabled ?? false) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: borderRadius ?? BorderRadius.circular(10.0),
+        ),
+      );
+    }
     String url = ref.read(apiProvider).getImageUrl(id, type);
     bool disableImageCaching =
         ref.read(databaseProvider("settings")).get("disableImageCaching") ??

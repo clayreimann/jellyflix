@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:jellyflix/components/ios_sheets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -149,9 +150,8 @@ class JfxButtonRow extends StatelessWidget {
           onPressed: available
               ? () => goToOfflinePlayer!(ref, playId!, context, title)
               : null,
-          icon: Icon(available
-              ? Icons.play_arrow_rounded
-              : Icons.cloud_off_rounded),
+          icon: Icon(
+              available ? Icons.play_arrow_rounded : Icons.cloud_off_rounded),
           label: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Text(
@@ -175,9 +175,9 @@ class JfxButtonRow extends StatelessWidget {
     ) {
       return SizedBox(
         child: Material(
-          child: PopupMenuButton(
+          child: AdaptivePopupMenuButton<dynamic>(
             itemBuilder: (BuildContext context) {
-              List<PopupMenuEntry> popUpItems = [];
+              List<PopupMenuEntry<dynamic>> popUpItems = [];
               for (var element in data.mediaSources!) {
                 popUpItems.add(PopupMenuItem(
                   value: element.id,
@@ -287,7 +287,7 @@ class JfxButtonRow extends StatelessWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(100.0),
         child: Material(
-          child: PopupMenuButton<String>(
+          child: AdaptivePopupMenuButton<String>(
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15.0)),
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -363,7 +363,8 @@ class JfxButtonRow extends StatelessWidget {
     }
 
     if (ref.read(isOfflineProvider)) {
-      return Row(children: [buildOfflinePlayButton(context, ref, data, layout)]);
+      return Row(
+          children: [buildOfflinePlayButton(context, ref, data, layout)]);
     }
 
     return Row(

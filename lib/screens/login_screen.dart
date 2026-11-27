@@ -49,14 +49,11 @@ class LoginScreen extends HookConsumerWidget {
                         const SizedBox(height: 20),
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10.0),
-                          child: TextField(
+                          child: AdaptiveTextField(
                             controller: serverAddress,
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText:
-                                  AppLocalizations.of(context)!.serverAddress,
-                              hintText: 'https://',
-                            ),
+                            label: AppLocalizations.of(context)!.serverAddress,
+                            hintText: 'https://',
+                            keyboardType: TextInputType.url,
                           ),
                         ),
                         Center(

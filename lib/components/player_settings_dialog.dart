@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/ios_sheets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/services/player_helper.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
@@ -26,6 +27,83 @@ class PlayerSettingsDialog extends StatelessWidget {
     required this.isSubtitleEnabled,
     required this.showBitrate,
   });
+
+  /// iOS: an action sheet listing Quality, Audio and Subtitles with their
+  /// current values; picking one opens a second sheet of its options, the
+  /// current one in bold.
+  Future<void> showOnIos(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final subtitle = playbackHelper.subtitles
+        .firstWhere((e) => e.index == subtitleTrack.index);
+    final audio = playbackHelper.audioStreams
+        .firstWhere((e) => e.index == audioTrack.index);
+    final bitrates = playbackHelper.getBitrateMap();
+
+    final section = await showIosActionSheet<String>(
+      context: context,
+      title: l10n.settings,
+      actions: [
+        if (showBitrate)
+          IosSheetAction(
+              value: 'quality',
+              label: '${l10n.quality}: ${bitrates[maxStreamingBitrate] ?? ''}'),
+        if (playbackHelper.audioStreams.length > 1)
+          IosSheetAction(
+              value: 'audio',
+              label: '${l10n.audio}: ${audio.displayTitle ?? l10n.none}'),
+        if (playbackHelper.subtitles.length > 1)
+          IosSheetAction(
+              value: 'subtitles',
+              label:
+                  '${l10n.subtitles}: ${isSubtitleEnabled ? subtitle.displayTitle ?? l10n.none : l10n.none}'),
+      ],
+    );
+    if (section == null || !context.mounted) return;
+
+    switch (section) {
+      case 'quality':
+        final picked = await showIosActionSheet<int>(
+          context: context,
+          title: l10n.quality,
+          actions: [
+            for (final e in bitrates.entries)
+              IosSheetAction(
+                  value: e.key,
+                  label: e.value,
+                  isDefault: e.key == maxStreamingBitrate),
+          ],
+        );
+        if (picked != null) onBitrateSelected(picked);
+      case 'audio':
+        final picked = await showIosActionSheet<MediaStream>(
+          context: context,
+          title: l10n.audio,
+          actions: [
+            for (final e in playbackHelper.audioStreams)
+              IosSheetAction(
+                  value: e,
+                  label: e.displayTitle ?? l10n.none,
+                  isDefault: e.index == audio.index),
+          ],
+        );
+        if (picked != null) onAudioSelected(picked);
+      case 'subtitles':
+        final picked = await showIosActionSheet<MediaStream>(
+          context: context,
+          title: l10n.subtitles,
+          actions: [
+            for (final e in playbackHelper.subtitles)
+              IosSheetAction(
+                  value: e,
+                  label: e.displayTitle ?? l10n.none,
+                  isDefault: isSubtitleEnabled
+                      ? e.index == subtitle.index
+                      : e.index == -1),
+          ],
+        );
+        if (picked != null) onSubtitleSelected(picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

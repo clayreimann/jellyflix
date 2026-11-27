@@ -134,6 +134,7 @@ class LibraryScreen extends HookConsumerWidget {
             onPressed: () async {
               await JfxFilterListDialog.show<BaseItemDto>(
                 context,
+                title: AppLocalizations.of(context)!.library,
                 enableOnlySingleSelection: true,
                 listData: allLibraries.value!,
                 selectedListData: selectedLibrary.value == null
@@ -166,7 +167,9 @@ class LibraryScreen extends HookConsumerWidget {
                   ]);
               if (!context.mounted) return;
               await JfxFilterListDialog.show<BaseItemDto>(context,
-                  listData: listData, selectedListData: genreFilter.value ?? [],
+                  title: AppLocalizations.of(context)!.genre,
+                  listData: listData,
+                  selectedListData: genreFilter.value ?? [],
                   onApplyButtonClick: (list) {
                 genreFilter.value = list;
                 context.pop(list);
@@ -182,6 +185,7 @@ class LibraryScreen extends HookConsumerWidget {
             length: filterType.value.map((e) => e.toString().split(".")).length,
             onPressed: () async {
               await JfxFilterListDialog.show<ItemFilter>(context,
+                  title: AppLocalizations.of(context)!.filter,
                   selectedListData: filterType.value,
                   listData: ItemFilter.values.where((e) {
                     return e != ItemFilter.isFolder &&

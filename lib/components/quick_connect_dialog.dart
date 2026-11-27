@@ -1,3 +1,5 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +16,69 @@ class QuickConnectDialog extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final codeController = useTextEditingController();
     final errorText = useState<String?>(null);
+    final busy = useState(false);
+    final l10n = AppLocalizations.of(context)!;
+
+    Future<void> connect() async {
+      busy.value = true;
+      final status = await ref
+          .read(apiProvider)
+          .authorizeQuickConnect(codeController.text);
+      busy.value = false;
+      if (!context.mounted) return;
+      switch (status) {
+        case 200:
+          context.pop();
+        case 401:
+          errorText.value = l10n.quickConnectError401;
+        case 404:
+          errorText.value = l10n.quickConnectError404;
+        default:
+          errorText.value = l10n.quickConnectErrorUnknown;
+      }
+    }
+
+    if (isCupertino(context)) {
+      // An iOS alert with a text field, like the system's own prompts.
+      return CupertinoAlertDialog(
+        title: Text(l10n.quickConnect),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 4),
+            Text(l10n.quickConnectDescription),
+            const SizedBox(height: 12),
+            CupertinoTextField(
+              controller: codeController,
+              placeholder: l10n.code,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              autofocus: true,
+              onSubmitted: (_) => connect(),
+            ),
+            if (errorText.value != null) ...[
+              const SizedBox(height: 8),
+              Text(errorText.value!,
+                  style: TextStyle(
+                      color: CupertinoColors.systemRed.resolveFrom(context))),
+            ],
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: busy.value ? null : connect,
+            child: busy.value
+                ? const CupertinoActivityIndicator()
+                : Text(l10n.connect),
+          ),
+        ],
+      );
+    }
 
     return Dialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -43,36 +108,7 @@ class QuickConnectDialog extends HookConsumerWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () async {
-                int isSuccess = await ref
-                    .read(apiProvider)
-                    .authorizeQuickConnect(codeController.text);
-                switch (isSuccess) {
-                  case 200:
-                    if (context.mounted) {
-                      context.pop();
-                    }
-                    break;
-                  case 401:
-                    if (context.mounted) {
-                      errorText.value =
-                          AppLocalizations.of(context)!.quickConnectError401;
-                    }
-                    break;
-                  case 404:
-                    if (context.mounted) {
-                      errorText.value =
-                          AppLocalizations.of(context)!.quickConnectError404;
-                    }
-                    break;
-                  default:
-                    if (context.mounted) {
-                      errorText.value = AppLocalizations.of(context)!
-                          .quickConnectErrorUnknown;
-                    }
-                    break;
-                }
-              },
+              onPressed: busy.value ? null : connect,
               child: Text(AppLocalizations.of(context)!.connect),
             ),
           ],

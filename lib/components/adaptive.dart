@@ -21,6 +21,14 @@ bool isCupertino(BuildContext context) =>
 bool get isCupertinoPlatform =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
+/// The system bar material on iOS: UIKit's default tab and toolbar
+/// background, slightly see-through so content blurs under it.
+const CupertinoDynamicColor iosChromeColor =
+    CupertinoDynamicColor.withBrightness(
+  color: Color(0xF0F9F9F9),
+  darkColor: Color(0xF01D1D1D),
+);
+
 /// A [Switch] that becomes a [CupertinoSwitch] on iOS.
 class AdaptiveSwitch extends StatelessWidget {
   final bool value;
@@ -276,6 +284,68 @@ class IosNavBarButton extends StatelessWidget {
       minimumSize: const Size(44, 44),
       onPressed: onPressed,
       child: Icon(icon, semanticLabel: semanticLabel),
+    );
+  }
+}
+
+/// A text field: a filled rounded [CupertinoTextField] with the label as
+/// its placeholder on iOS, an outlined Material [TextField] elsewhere.
+class AdaptiveTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String label;
+  final String? hintText;
+  final bool obscureText;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final TextInputType? keyboardType;
+  final ValueChanged<String>? onSubmitted;
+
+  const AdaptiveTextField({
+    super.key,
+    this.controller,
+    required this.label,
+    this.hintText,
+    this.obscureText = false,
+    this.autofillHints,
+    this.textInputAction,
+    this.keyboardType,
+    this.onSubmitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isCupertino(context)) {
+      return CupertinoTextField(
+        controller: controller,
+        placeholder: label,
+        obscureText: obscureText,
+        autofillHints: autofillHints,
+        textInputAction: textInputAction,
+        keyboardType: keyboardType,
+        onSubmitted: onSubmitted,
+        autocorrect: false,
+        clearButtonMode: obscureText
+            ? OverlayVisibilityMode.never
+            : OverlayVisibilityMode.editing,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+          borderRadius: BorderRadius.circular(10),
+        ),
+      );
+    }
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      autofillHints: autofillHints,
+      textInputAction: textInputAction,
+      keyboardType: keyboardType,
+      onSubmitted: onSubmitted,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        labelText: label,
+        hintText: hintText,
+      ),
     );
   }
 }

@@ -1,3 +1,6 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:jellyflix/components/adaptive.dart';
+import 'package:jellyflix/components/settings_list.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -19,6 +22,10 @@ class MpvConfigDialog extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mpvConfig = useState(_mpvConfig);
     final textController = useTextEditingController(text: _mpvConfig);
+
+    if (isCupertino(context)) {
+      return _iosPage(context, textController, mpvConfig);
+    }
 
     return AlertDialog(
       title: Text(AppLocalizations.of(context)!.mpvConfigTitle),
@@ -101,6 +108,81 @@ class MpvConfigDialog extends HookConsumerWidget {
           child: Text(AppLocalizations.of(context)!.save),
         ),
       ],
+    );
+  }
+
+  /// iOS: a full-screen modal editor with Cancel and Save in the bar, like
+  /// composing a note, rather than a cramped alert.
+  Widget _iosPage(BuildContext context, TextEditingController textController,
+      ValueNotifier<String> mpvConfig) {
+    final l10n = AppLocalizations.of(context)!;
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return CupertinoPageScaffold(
+      backgroundColor:
+          CupertinoColors.systemGroupedBackground.resolveFrom(context),
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(l10n.mpvConfigTitle),
+        transitionBetweenRoutes: false,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.pop(context, mpvConfig.value),
+          child: Text(l10n.save,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
+      ),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(l10n.customMpvConfigDescription,
+                style: TextStyle(fontSize: 13, color: secondary)),
+            const SizedBox(height: 12),
+            CupertinoTextField(
+              controller: textController,
+              minLines: 10,
+              maxLines: 20,
+              placeholder: 'hwdec=auto\ncache=yes\ncache-secs=120',
+              autocorrect: false,
+              enableSuggestions: false,
+              padding: const EdgeInsets.all(12),
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 14,
+                color: CupertinoColors.label.resolveFrom(context),
+              ),
+              decoration: BoxDecoration(
+                color: CupertinoColors.secondarySystemGroupedBackground
+                    .resolveFrom(context),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              onChanged: (value) => mpvConfig.value = value,
+            ),
+            const SizedBox(height: 16),
+            CupertinoButton(
+              onPressed: () async {
+                if (await showIosDestructiveConfirm(
+                  context: context,
+                  title: Text(l10n.mpvConfigResetDescription),
+                  confirmLabel: l10n.resetToDefault,
+                  cancelLabel: l10n.cancel,
+                )) {
+                  final defaultConfig = getDefaultConfig();
+                  textController.text = defaultConfig;
+                  mpvConfig.value = defaultConfig;
+                }
+              },
+              child: Text(l10n.resetToDefault,
+                  style: TextStyle(
+                      color: CupertinoColors.systemRed.resolveFrom(context))),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

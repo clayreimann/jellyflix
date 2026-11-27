@@ -65,26 +65,20 @@ class LoginPasswordScreen extends HookConsumerWidget {
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10.0),
-                          child: TextField(
+                          child: AdaptiveTextField(
                             controller: userName,
                             autofillHints: const [AutofillHints.username],
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: AppLocalizations.of(context)!.username,
-                            ),
+                            label: AppLocalizations.of(context)!.username,
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10.0),
-                          child: TextField(
+                          child: AdaptiveTextField(
                             obscureText: true,
                             autofillHints: const [AutofillHints.password],
                             textInputAction: TextInputAction.go,
                             controller: password,
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: AppLocalizations.of(context)!.password,
-                            ),
+                            label: AppLocalizations.of(context)!.password,
                           ),
                         ),
                         Padding(

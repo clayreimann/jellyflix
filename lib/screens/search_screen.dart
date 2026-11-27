@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/components/adaptive.dart';
@@ -16,13 +18,48 @@ class SearchScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // What's typed, and the query actually searched: the latter waits
+    // until typing pauses, so each keystroke doesn't start a new search.
+    final typed = useState<String?>(null);
     final searchQuery = useState<String?>(null);
+    useEffect(() {
+      if (typed.value == null) {
+        searchQuery.value = null;
+        return null;
+      }
+      final timer = Timer(const Duration(milliseconds: 300),
+          () => searchQuery.value = typed.value);
+      return timer.cancel;
+    }, [typed.value]);
+
+    // One request per kind per query. Building the futures inline started a
+    // fresh search on every rebuild, which flashed the placeholders again.
+    final futures = useMemoized(
+      () => {
+        for (final kind in [
+          BaseItemKind.movie,
+          BaseItemKind.series,
+          BaseItemKind.episode,
+          BaseItemKind.boxSet,
+        ])
+          // Before the first query lands, a future that never completes
+          // keeps the placeholders up. Later queries keep showing the
+          // previous results until the new ones arrive.
+          kind: searchQuery.value == null
+              ? Completer<List<BaseItemDto>>().future
+              : ref.read(apiProvider).getFilterItems(
+                  searchTerm: searchQuery.value,
+                  includeItemTypes: [kind],
+                ),
+      },
+      [searchQuery.value],
+    );
 
     final l10n = AppLocalizations.of(context)!;
     final searchField = AdaptiveSearchField(
       hintText: l10n.search,
       onChanged: (value) {
-        searchQuery.value = value != "" ? value : null;
+        typed.value = value != "" ? value : null;
       },
     );
     final emptyHint = Center(
@@ -38,10 +75,7 @@ class SearchScreen extends HookConsumerWidget {
           titleMapping: (e) => e.name!,
           imageMapping: (e) => e.id!,
           blurHashMapping: (e) => e.imageBlurHashes?.primary?.values.first,
-          future: ref.read(apiProvider).getFilterItems(
-            searchTerm: searchQuery.value,
-            includeItemTypes: [BaseItemKind.movie],
-          ),
+          future: futures[BaseItemKind.movie]!,
           onTap: (p0, p1) {
             context.pushNamed(ScreenPaths.search + ScreenPaths.detail,
                 queryParameters: {
@@ -54,10 +88,7 @@ class SearchScreen extends HookConsumerWidget {
             titleMapping: (e) => e.name!,
             imageMapping: (e) => e.id!,
             blurHashMapping: (e) => e.imageBlurHashes?.primary?.values.first,
-            future: ref.read(apiProvider).getFilterItems(
-              searchTerm: searchQuery.value,
-              includeItemTypes: [BaseItemKind.series],
-            ),
+            future: futures[BaseItemKind.series]!,
             onTap: (p0, p1) {
               context.pushNamed(ScreenPaths.search + ScreenPaths.detail,
                   queryParameters: {
@@ -69,10 +100,7 @@ class SearchScreen extends HookConsumerWidget {
             titleMapping: (e) => e.name!,
             imageMapping: (e) => e.id!,
             blurHashMapping: (e) => e.imageBlurHashes?.primary?.values.first,
-            future: ref.read(apiProvider).getFilterItems(
-              searchTerm: searchQuery.value,
-              includeItemTypes: [BaseItemKind.episode],
-            ),
+            future: futures[BaseItemKind.episode]!,
             onTap: (p0, p1) {
               context.pushNamed(ScreenPaths.search + ScreenPaths.detail,
                   queryParameters: {
@@ -84,12 +112,7 @@ class SearchScreen extends HookConsumerWidget {
           titleMapping: (e) => e.name!,
           imageMapping: (e) => e.id!,
           blurHashMapping: (e) => e.imageBlurHashes?.primary?.values.first,
-          future: ref.read(apiProvider).getFilterItems(
-            searchTerm: searchQuery.value,
-            includeItemTypes: [
-              BaseItemKind.boxSet,
-            ],
-          ),
+          future: futures[BaseItemKind.boxSet]!,
           onTap: (p0, p1) {
             context.pushNamed(ScreenPaths.search + ScreenPaths.detail,
                 queryParameters: {
@@ -124,7 +147,7 @@ class SearchScreen extends HookConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               sliver: SliverToBoxAdapter(child: searchField),
             ),
-            if ((searchQuery.value ?? "").isEmpty)
+            if ((typed.value ?? "").isEmpty)
               SliverFillRemaining(hasScrollBody: false, child: emptyHint)
             else
               SliverToBoxAdapter(child: results),
@@ -145,7 +168,7 @@ class SearchScreen extends HookConsumerWidget {
                 height: 20,
               ),
               Expanded(
-                child: (searchQuery.value ?? "").isEmpty
+                child: (typed.value ?? "").isEmpty
                     ? emptyHint
                     : SingleChildScrollView(child: results),
               ),

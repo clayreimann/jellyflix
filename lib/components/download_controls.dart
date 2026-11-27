@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:jellyflix/components/download_settings_dialog.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:jellyflix/models/bitrates.dart';
@@ -145,10 +146,13 @@ Future<void> runDownloadAction(
       .length;
 
   if (context.mounted && (audioCount > 1 || subtitleCount > 0)) {
-    (int?, int?)? selectedSettings = await showDialog(
-      context: context,
-      builder: (context) => DownloadSettingsDialog(downloadInfo: downloadInfo),
-    );
+    (int?, int?)? selectedSettings = isCupertino(context)
+        ? await DownloadSettingsDialog.pickOnIos(context, ref, downloadInfo)
+        : await showDialog(
+            context: context,
+            builder: (context) =>
+                DownloadSettingsDialog(downloadInfo: downloadInfo),
+          );
     if (selectedSettings == null ||
         (selectedSettings.$1 == null && selectedSettings.$2 == null)) {
       return;
@@ -170,7 +174,8 @@ Future<void> runDownloadAction(
 
 /// Adds downloads to the app's queue, which starts them as slots free up.
 /// Returns once each is either started or waiting.
-Future<void> queueDownload(WidgetRef ref, List<QueuedDownload> downloads) async {
+Future<void> queueDownload(
+    WidgetRef ref, List<QueuedDownload> downloads) async {
   final queue = ref.read(downloadQueueProvider);
   // add them all before the first starts, so the order holds
   await Future.wait(downloads.map(queue.add));
@@ -224,8 +229,7 @@ class DownloadStateButton extends ConsumerWidget {
     }
     return IconButton(
       tooltip: downloadActionLabel(context, action),
-      onPressed: () =>
-          runDownloadAction(context, ref, itemId, shown: action),
+      onPressed: () => runDownloadAction(context, ref, itemId, shown: action),
       icon: icon,
     );
   }

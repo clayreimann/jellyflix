@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -308,41 +309,43 @@ class PlayerHelper {
       if (showBitrate || subtitles.length > 1 || audioStreams.length > 1)
         MaterialDesktopCustomButton(
           onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => PlayerSettingsDialog(
-                playbackHelper: this,
-                showBitrate: showBitrate,
-                audioTrack: audioTrack!.value,
-                subtitleTrack: subtitleTrack!.value,
-                isSubtitleEnabled: subtitleEnabled.value,
-                maxStreamingBitrate: maxStreamingBitrate!.value,
-                onSubtitleSelected: (value) async {
-                  if (value != null) {
-                    subtitleEnabled.value = value.index == -1 ? false : true;
-                    subtitleTrack.value = value;
-                    //logger.verbose("Setting subtitle: ${value.displayTitle}");
-                    await setSubtitle(value);
+            final settings = PlayerSettingsDialog(
+              playbackHelper: this,
+              showBitrate: showBitrate,
+              audioTrack: audioTrack!.value,
+              subtitleTrack: subtitleTrack!.value,
+              isSubtitleEnabled: subtitleEnabled.value,
+              maxStreamingBitrate: maxStreamingBitrate!.value,
+              onSubtitleSelected: (value) async {
+                if (value != null) {
+                  subtitleEnabled.value = value.index == -1 ? false : true;
+                  subtitleTrack.value = value;
+                  //logger.verbose("Setting subtitle: ${value.displayTitle}");
+                  await setSubtitle(value);
+                }
+              },
+              onAudioSelected: (value) async {
+                if (audioTrack.value != value) {
+                  audioTrack.value = value!;
+                  await setAudio(value);
+                }
+              },
+              onBitrateSelected: (value) async {
+                if (maxStreamingBitrate.value != value) {
+                  maxStreamingBitrate.value = value!;
+                  await setBitrate(value);
+                  // opening a new stream will reset the subtitle track
+                  if (subtitleEnabled.value) {
+                    await enableSubtitle();
                   }
-                },
-                onAudioSelected: (value) async {
-                  if (audioTrack.value != value) {
-                    audioTrack.value = value!;
-                    await setAudio(value);
-                  }
-                },
-                onBitrateSelected: (value) async {
-                  if (maxStreamingBitrate.value != value) {
-                    maxStreamingBitrate.value = value!;
-                    await setBitrate(value);
-                    // opening a new stream will reset the subtitle track
-                    if (subtitleEnabled.value) {
-                      await enableSubtitle();
-                    }
-                  }
-                },
-              ),
+                }
+              },
             );
+            if (isCupertino(context)) {
+              settings.showOnIos(context);
+            } else {
+              showDialog(context: context, builder: (context) => settings);
+            }
           },
           icon: const Icon(
             Icons.settings_rounded,

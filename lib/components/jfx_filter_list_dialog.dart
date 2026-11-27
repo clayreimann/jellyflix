@@ -3,6 +3,8 @@ import 'package:material_ui/material_ui.dart';
 // filter_list still takes types from the deprecated in-SDK Material library.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart' as legacy show OutlineInputBorder;
+import 'package:jellyflix/components/adaptive.dart';
+import 'package:jellyflix/components/ios_sheets.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:tentacle/tentacle.dart';
 
@@ -13,6 +15,7 @@ class JfxFilterListDialog<T extends Object> {
     required selectedListData,
     required onApplyButtonClick,
     enableOnlySingleSelection,
+    String? title,
   }) async {
     for (var item in listData) {
       if (!(item is ItemFilter || item is BaseItemDto)) {
@@ -26,6 +29,23 @@ class JfxFilterListDialog<T extends Object> {
         throw ArgumentError(
             'All items must be of type FilterType or BaseItemDto');
       }
+    }
+    if (isCupertino(context)) {
+      // iOS: a full-screen checklist instead of a chip grid in a dialog.
+      final l10n = AppLocalizations.of(context)!;
+      final single = enableOnlySingleSelection ?? false;
+      return showIosListPicker<T>(
+        context: context,
+        title: title ?? l10n.filter,
+        items: List<T>.from(listData),
+        selected: List<T>.from(selectedListData),
+        label: (item) =>
+            item is ItemFilter ? item.name : (item as BaseItemDto).name ?? '',
+        multiple: !single,
+        clearLabel: single ? l10n.all : null,
+        // The caller's handler closes the page itself.
+        onDone: (list) => onApplyButtonClick(list),
+      );
     }
     return showDialog(
       context: context,

@@ -1,3 +1,5 @@
+import 'package:jellyflix/components/ios_sheets.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// The one row layout for episodes and downloads everywhere in the app:
@@ -96,8 +98,9 @@ class MediaRow extends StatelessWidget {
             ),
             if (trailing != null) trailing!,
             if (menuEntries != null && menuEntries!.isNotEmpty)
-              PopupMenuButton<String>(
+              AdaptivePopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
+                iosIcon: const Icon(CupertinoIcons.ellipsis),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15.0)),
                 itemBuilder: (context) => menuEntries!,

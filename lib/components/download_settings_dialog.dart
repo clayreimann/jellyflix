@@ -1,3 +1,4 @@
+import 'package:jellyflix/components/ios_sheets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:jellyflix/providers/logger_provider.dart';
@@ -9,6 +10,59 @@ class DownloadSettingsDialog extends HookConsumerWidget {
   final PlaybackInfoResponse downloadInfo;
 
   const DownloadSettingsDialog({super.key, required this.downloadInfo});
+
+  /// iOS: asks for the audio track, then the subtitles, each in an action
+  /// sheet with the current choice in bold. Returns the same pair as the
+  /// dialog, or null when the user cancels.
+  static Future<(int?, int?)?> pickOnIos(BuildContext context, WidgetRef ref,
+      PlaybackInfoResponse downloadInfo) async {
+    final l10n = AppLocalizations.of(context)!;
+    final playerHelper = PlayerHelper(
+        playbackInfo: downloadInfo, logger: ref.read(loggerProvider));
+    MediaStream audio = playerHelper.getDefaultAudio();
+    MediaStream subtitle = playerHelper.getDefaultSubtitle();
+
+    if (playerHelper.audioStreams.length > 1 && playerHelper.isTranscoding) {
+      final picked = await showIosActionSheet<MediaStream>(
+        context: context,
+        title: l10n.audio,
+        actions: [
+          for (final e in playerHelper.audioStreams)
+            IosSheetAction(
+              value: e,
+              label: e.displayTitle ?? l10n.none,
+              isDefault: e.index == audio.index,
+            ),
+        ],
+      );
+      if (picked == null) return null;
+      audio = picked;
+    }
+
+    // Only external subtitles (or none) can be downloaded.
+    final subtitles = playerHelper.subtitles
+        .where((e) =>
+            e.deliveryMethod == SubtitleDeliveryMethod.external_ ||
+            e.index == -1)
+        .toList();
+    if (subtitles.length > 1 && context.mounted) {
+      final picked = await showIosActionSheet<MediaStream>(
+        context: context,
+        title: l10n.subtitles,
+        actions: [
+          for (final e in subtitles)
+            IosSheetAction(
+              value: e,
+              label: e.displayTitle ?? l10n.none,
+              isDefault: e.index == subtitle.index,
+            ),
+        ],
+      );
+      if (picked == null) return null;
+      subtitle = picked;
+    }
+    return (audio.index, subtitle.index);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

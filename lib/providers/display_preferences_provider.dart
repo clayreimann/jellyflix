@@ -16,7 +16,8 @@ class UseEpisodeImagesNotifier extends AsyncNotifier<bool> {
   }
 
   /// Flips the switch at once, then saves to the server. If the save
-  /// fails (e.g. offline), the switch goes back.
+  /// fails (e.g. offline), the switch goes back and the error is rethrown
+  /// so the caller can say why.
   Future<void> toggle(bool value) async {
     final previous = state;
     state = AsyncData(value);
@@ -27,6 +28,7 @@ class UseEpisodeImagesNotifier extends AsyncNotifier<bool> {
           .timeout(const Duration(seconds: 10));
     } catch (_) {
       state = previous;
+      rethrow;
     }
   }
 }

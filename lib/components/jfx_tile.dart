@@ -1,4 +1,6 @@
+import 'package:jellyflix/components/adaptive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:tentacle/tentacle.dart';
 import 'package:jellyflix/components/jellyfin_image.dart';
 import 'package:jellyflix/components/focus_border.dart';
@@ -105,14 +107,19 @@ class _JfxTileState extends State<JfxTile> {
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10.0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            spreadRadius: 2,
-                            blurRadius: 5,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
+                        // A drop shadow only on the dark theme off iOS. On
+                        // light pages it reads as a heavy smudge, and the
+                        // skeleton drew it around every placeholder.
+                        boxShadow: _showShadow(context)
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  spreadRadius: 2,
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: JellyfinImage(
                         id: widget.id,
@@ -142,3 +149,8 @@ class _JfxTileState extends State<JfxTile> {
     );
   }
 }
+
+bool _showShadow(BuildContext context) =>
+    !isCupertino(context) &&
+    Theme.of(context).brightness == Brightness.dark &&
+    !(Skeletonizer.maybeOf(context)?.enabled ?? false);

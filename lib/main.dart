@@ -85,10 +85,15 @@ class MyApp extends ConsumerWidget {
 /// reads on white.
 ThemeData buildAppTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
-  final colorScheme = ColorScheme.fromSeed(
+  final seeded = ColorScheme.fromSeed(
       seedColor: Colors.deepPurple,
       primary: dark ? const Color(0xFFDBEBC0) : const Color(0xFF4C662B),
       brightness: brightness);
+  // iOS pages are plain white or black, not Material's tinted surface.
+  final colorScheme = isCupertinoPlatform
+      ? seeded.copyWith(
+          surface: dark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+      : seeded;
   return ThemeData(
     // iOS has no ink ripple: taps only highlight.
     splashFactory: isCupertinoPlatform ? NoSplash.splashFactory : null,
@@ -122,9 +127,10 @@ ThemeData buildAppTheme(Brightness brightness) {
         ? CupertinoThemeData(
             brightness: brightness,
             primaryColor: colorScheme.primary,
-            // The page colour, slightly see-through so the bars blur
-            // what scrolls under them.
-            barBackgroundColor: colorScheme.surface.withValues(alpha: 0.94),
+            // The system bar material, slightly see-through so the bars
+            // blur what scrolls under them.
+            barBackgroundColor:
+                dark ? iosChromeColor.darkColor : iosChromeColor.color,
             scaffoldBackgroundColor: colorScheme.surface,
           )
         : null,

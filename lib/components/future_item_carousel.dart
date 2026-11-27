@@ -1,4 +1,3 @@
-import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:jellyflix/components/item_carousel.dart';
@@ -39,7 +38,7 @@ class FutureItemCarousel extends StatelessWidget {
         future: future,
         builder: (context, snapshot) {
           List<BaseItemDto> data =
-              List.filled(Random().nextInt(4) + 3, SkeletonItem.baseItemDto);
+              List.filled(4, SkeletonItem.baseItemDto);
           if (snapshot.hasData) {
             data = snapshot.data!;
             if (data.isEmpty) {

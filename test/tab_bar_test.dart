@@ -2,7 +2,6 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:jellyflix/components/ios_tab_bar.dart';
 import 'package:jellyflix/components/responsive_navigation_bar.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 import 'package:jellyflix/models/auth_state.dart';
@@ -42,11 +41,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(TargetPlatform.iOS));
     await tester.pumpAndSettle();
-    expect(find.byType(IosTabBar), findsOneWidget);
+    expect(find.byType(CupertinoTabBar), findsOneWidget);
     expect(find.byType(BottomNavigationBar), findsNothing);
-    // Upright: icon over label in a 49pt bar.
-    expect(tester.getSize(find.byType(IosTabBar)).height,
-        IosTabBar.portraitHeight);
+    expect(tester.getSize(find.byType(CupertinoTabBar)).height, 50.0 + 0);
 
     await tester.tap(find.byIcon(CupertinoIcons.search));
     await tester.pumpAndSettle();
@@ -55,21 +52,14 @@ void main() {
     expect(find.byIcon(CupertinoIcons.house_fill), findsOneWidget);
   });
 
-  testWidgets('iPhone in landscape keeps a short iOS tab bar', (tester) async {
+  testWidgets('iPhone in landscape keeps the iOS tab bar', (tester) async {
     tester.view.physicalSize = const Size(844 * 3, 390 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(TargetPlatform.iOS));
     await tester.pumpAndSettle();
-    expect(find.byType(IosTabBar), findsOneWidget);
+    expect(find.byType(CupertinoTabBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(tester.getSize(find.byType(IosTabBar)).height,
-        IosTabBar.landscapeHeight);
-    // Icon and label side by side.
-    final icon = tester.getCenter(find.byIcon(CupertinoIcons.search));
-    final label = tester.getCenter(find.text('Search'));
-    expect(label.dx, greaterThan(icon.dx));
-    expect((label.dy - icon.dy).abs(), lessThan(4));
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
@@ -80,7 +70,7 @@ void main() {
       await tester.pumpWidget(_app(platform));
       await tester.pumpAndSettle();
       expect(find.byType(BottomNavigationBar), findsOneWidget);
-      expect(find.byType(IosTabBar), findsNothing);
+      expect(find.byType(CupertinoTabBar), findsNothing);
     });
   }
 }
