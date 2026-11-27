@@ -20,6 +20,12 @@ class DownloadedShowScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final library = ref.watch(downloadLibraryProvider);
     final show = library.value?.show(seriesId);
+    final showSize = show == null
+        ? 0
+        : ref
+                .watch(downloadItemsSizeProvider(downloadSizeKey(show.episodes)))
+                .value ??
+            0;
 
     Future<void> deleteAll() async {
       for (var e in show!.episodes) {
@@ -112,7 +118,10 @@ class DownloadedShowScreen extends ConsumerWidget {
                                         ?.copyWith(
                                             fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                Text(l10n.episodeCount(show.episodes.length)),
+                                Text([
+                                  l10n.episodeCount(show.episodes.length),
+                                  if (showSize > 0) formatBytes(showSize),
+                                ].join(" · ")),
                               ],
                             ),
                           ),

@@ -992,6 +992,36 @@ class ApiService {
             limit: 4);
   }
 
+  /// Sets where the user is in an item, and when they were there (used to
+  /// send positions saved while offline). Needs Jellyfin 10.9 or later;
+  /// older servers get a stop report instead, which records the position
+  /// but stamps it with the current time.
+  Future<void> saveUserItemData(
+      {required String itemId,
+      required int positionTicks,
+      required bool played,
+      required DateTime lastPlayed}) async {
+    try {
+      await _jellyfinApi!.getItemsApi().updateItemUserData(
+          itemId: itemId,
+          userId: _user!.id!,
+          headers: headers,
+          updateUserItemDataDto: UpdateUserItemDataDto((b) => b
+            ..playbackPositionTicks = played ? 0 : positionTicks
+            ..played = played
+            ..lastPlayedDate = lastPlayed.toUtc()));
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404 && e.response?.statusCode != 405) {
+        rethrow;
+      }
+      if (played) {
+        await markAsPlayed(itemId: itemId, played: true);
+      } else {
+        await reportStopPlayback(positionTicks, itemId: itemId);
+      }
+    }
+  }
+
   Future<void> markAsPlayed(
       {required String itemId, required bool played}) async {
     if (played) {

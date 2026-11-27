@@ -63,6 +63,16 @@ Future<void> _updateServerReachable(Ref ref) async {
       })
           // then start whatever was still waiting in the queue
           .whenComplete(queue.pump);
+      // positions saved while watching downloads offline
+      DownloadService.syncPlaybackPositions(
+              api,
+              (id) => DownloadService(api,
+                  itemId: id, connectivityService: connectivity, logger: logger))
+          .then((count) => logger.verbose("Downloads: synced $count positions"))
+          .catchError((e) {
+        logger.error("Downloads: position sync failed", error: e);
+        return 0;
+      });
       api.syncOfflineLibrary().then((_) async {
         // keep posters for the whole library so it looks right offline
         final cache = api.offlineCache;

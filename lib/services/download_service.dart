@@ -15,6 +15,7 @@ import 'package:async/async.dart';
 import 'package:jellyflix/l10n/generated/app_localizations.dart';
 
 import 'package:jellyflix/models/download_metadata.dart';
+import 'package:jellyflix/models/playback_position.dart';
 import 'package:jellyflix/navigation/app_router.dart';
 import 'package:jellyflix/providers/scaffold_key.dart';
 import 'package:jellyflix/services/api_service.dart';
@@ -239,10 +240,19 @@ class DownloadService {
     var dir = Directory("$downloadDirectory${Platform.pathSeparator}$itemId");
     if (!await dir.exists()) return 0;
     int size = 0;
-    await for (var entity in dir.list(recursive: true)) {
-      if (entity is File) {
-        size += await entity.length();
+    try {
+      await for (var entity in dir.list(recursive: true)) {
+        if (entity is! File) continue;
+        try {
+          size += await entity.length();
+        } catch (_) {
+          // gone since it was listed (a temporary file renamed into place,
+          // or a finished segment moved by the downloader): skip it, rather
+          // than failing the whole total so no size shows at all
+        }
       }
+    } catch (_) {
+      // folder removed mid-scan
     }
     return size;
   }
@@ -308,6 +318,71 @@ class DownloadService {
     }
     return resumed;
   }
+
+  Future<String> _positionPath() async =>
+      "${await getDownloadDirectory()}${Platform.pathSeparator}$itemId${Platform.pathSeparator}position.json";
+
+  /// The playback position saved on the device, if any.
+  Future<PlaybackPosition?> readPosition() async {
+    try {
+      final file = File(await _positionPath());
+      if (!await file.exists()) return null;
+      return PlaybackPosition.fromJson(
+          Map<String, dynamic>.from(jsonDecode(await file.readAsString())));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Saves the playback position next to the download (so it goes away with
+  /// it). Skipped if the download has been removed meanwhile.
+  final AsyncLock _positionLock = AsyncLock();
+
+  Future<void> writePosition(PlaybackPosition position) =>
+      // in order, so a periodic save can't land after the final one
+      _positionLock.run(() => _writePosition(position));
+
+  Future<void> _writePosition(PlaybackPosition position) async {
+    try {
+      if (!await _hasFolder()) return;
+      await _writeAtomically(await _positionPath(), jsonEncode(position));
+    } catch (e) {
+      logger.warning("Downloads: could not save position: $e");
+    }
+  }
+
+  static final SingleFlight<int> _syncingPositions = SingleFlight();
+
+  /// Sends positions saved while offline to the server, unless the server
+  /// has something newer (played elsewhere since). Returns how many were
+  /// sent. Called when the server becomes reachable.
+  static Future<int> syncPlaybackPositions(
+          ApiService api, DownloadService Function(String itemId) serviceFor) =>
+      _syncingPositions.run(() async {
+        int sent = 0;
+        for (var id in await getDownloadedItems()) {
+          try {
+            final service = serviceFor(id);
+            final local = await service.readPosition();
+            if (local == null || local.synced) continue;
+            final details = await api.getItemDetails(id);
+            final serverLastPlayed = details.userData?.lastPlayedDate;
+            if (serverLastPlayed == null ||
+                !serverLastPlayed.isAfter(local.updatedAt)) {
+              await api.saveUserItemData(
+                  itemId: id,
+                  positionTicks: local.ticks,
+                  played: local.played,
+                  lastPlayed: local.updatedAt);
+              sent++;
+            }
+            await service.writePosition(local.copyWith(synced: true));
+          } catch (_) {
+            // offline again or the item is gone from the server; try later
+          }
+        }
+        return sent;
+      });
 
   Future<String> getDownloadedItemPath() async {
     var downloadDir = await getDownloadDirectory();

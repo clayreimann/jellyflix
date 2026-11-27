@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:jellyflix/models/download_metadata.dart';
+import 'package:jellyflix/models/playback_position.dart';
+import 'package:jellyflix/services/api_service.dart';
+import 'package:jellyflix/services/download_service.dart';
 import 'package:jellyflix/services/player_helper.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:tentacle/tentacle.dart';
@@ -9,11 +12,24 @@ class OfflinePlayerHelper extends PlayerHelper {
   late int bitrate;
   late final DownloadMetadata downloadMetadata;
 
+  /// Where to start when the caller doesn't ask for a position (see
+  /// [PlaybackPosition.resumeTicks]).
+  final int resumeTicks;
+
+  /// Saves the position next to the download.
+  final DownloadService? download;
+
+  /// Tells the server the position when it's reachable.
+  final ApiService? api;
+
   OfflinePlayerHelper(
       {required playbackInfo,
       required this.downloadMetadata,
       required logger,
-      String? mpvConfig})
+      String? mpvConfig,
+      this.resumeTicks = 0,
+      this.download,
+      this.api})
       : super(
             playbackInfo: playbackInfo, logger: logger, mpvConfig: mpvConfig) {
     audioStream = getDefaultAudio();
@@ -41,8 +57,9 @@ class OfflinePlayerHelper extends PlayerHelper {
   @override
   Future<void> initStream(int startTimeTicks) async {
     String streamUrl = downloadMetadata.path!;
-    player.open(
-        Media(streamUrl, start: Duration(microseconds: startTimeTicks ~/ 10)));
+    final start = startTimeTicks > 0 ? startTimeTicks : resumeTicks;
+    player.open(Media(streamUrl, start: Duration(microseconds: start ~/ 10)));
+    _trackPosition();
     StreamSubscription? trackStream;
     trackStream = player.stream.tracks.listen((event) {
       List<AudioTrack> audioTracks = event.audio;
@@ -60,13 +77,68 @@ class OfflinePlayerHelper extends PlayerHelper {
     });
   }
 
-  // no additional logic needed for offline playback
-  @override
-  Future<void> completedPlayback() async {}
+  static const _saveEvery = Duration(seconds: 5);
+  StreamSubscription<Duration>? _positionSub;
+  DateTime _lastSave = DateTime.fromMillisecondsSinceEpoch(0);
+  int _lastTicks = 0;
+  bool _finished = false;
 
-  // no additional logic needed for offline playback
+  /// Saves the position on the device every few seconds while playing, so
+  /// it survives however the player is closed (back button, swipe, app
+  /// killed).
+  void _trackPosition() {
+    _positionSub?.cancel();
+    _positionSub = player.stream.position.listen((position) {
+      final ticks = position.inMicroseconds * 10;
+      if (ticks <= 0) return;
+      _lastTicks = ticks;
+      final now = DateTime.now();
+      if (now.difference(_lastSave) < _saveEvery) return;
+      _lastSave = now;
+      _save(ticks, played: false);
+    }, onDone: () => _positionSub = null);
+  }
+
+  Future<void> _save(int ticks, {required bool played}) async {
+    await download?.writePosition(PlaybackPosition(
+        ticks: played ? 0 : ticks,
+        updatedAt: DateTime.now(),
+        played: played));
+  }
+
+  /// Final save when playback ends; also tells the server if it's
+  /// reachable (otherwise that happens on the next sync).
+  Future<void> _stop({required bool played}) async {
+    if (_finished) return;
+    _finished = true;
+    await _positionSub?.cancel();
+    _positionSub = null;
+    final ticks = _lastTicks;
+    if (ticks <= 0 && !played) return;
+    played = played ||
+        PlaybackPosition.isFinished(ticks, downloadMetadata.runTimeTicks);
+    final position = PlaybackPosition(
+        ticks: played ? 0 : ticks, updatedAt: DateTime.now(), played: played);
+    await download?.writePosition(position);
+    final api = this.api;
+    if (api == null || api.offline || api.currentUser == null) return;
+    try {
+      await api.saveUserItemData(
+          itemId: downloadMetadata.id,
+          positionTicks: position.ticks,
+          played: played,
+          lastPlayed: position.updatedAt);
+      await download?.writePosition(position.copyWith(synced: true));
+    } catch (_) {
+      // left unsynced; sent the next time the server is reachable
+    }
+  }
+
   @override
-  Future<void> backButtonPressed() async {}
+  Future<void> completedPlayback() => _stop(played: true);
+
+  @override
+  Future<void> backButtonPressed() => _stop(played: false);
 
   @override
   Future<void> setAudio(MediaStream mediaStream) async {
