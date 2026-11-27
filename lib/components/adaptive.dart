@@ -257,8 +257,23 @@ class IosLargeTitlePage extends StatelessWidget {
               ),
             ),
           ...slivers,
+          const IosBottomInset(),
         ],
       ),
+    );
+  }
+}
+
+/// Space at the end of an iOS scroll view for the floating tab bar (its
+/// height arrives as the bottom padding), so the last items can scroll
+/// clear of it.
+class IosBottomInset extends StatelessWidget {
+  const IosBottomInset({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: SizedBox(height: MediaQuery.paddingOf(context).bottom),
     );
   }
 }

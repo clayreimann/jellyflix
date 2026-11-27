@@ -82,7 +82,8 @@ class DownloadedShowScreen extends ConsumerWidget {
           : show == null
               ? Center(child: Text(l10n.noDownloads))
               : ListView(
-                  padding: const EdgeInsets.only(bottom: 40),
+                  padding: EdgeInsets.only(
+                      bottom: 40 + MediaQuery.paddingOf(context).bottom),
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16),

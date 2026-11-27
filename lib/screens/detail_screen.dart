@@ -1,3 +1,4 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:jellyflix/components/adaptive.dart';
 import 'dart:async';
 import 'dart:ui';
@@ -43,14 +44,25 @@ class DetailScreen extends HookConsumerWidget {
 
     final scrollController = useScrollController();
     final appBarColorTransaparent = useState(true);
+    final ios = isCupertino(context);
+
+    final layout = JfxLayout.scalingLayout(context);
+    final featuredPosterHeight = layout.tileHeight * 1.3;
+    // iOS: the bar turns solid and shows the title only once the header
+    // (poster and name) has scrolled up under it, like the TV and Music
+    // apps, rather than at the first pixel.
+    final barThreshold = ios ? featuredPosterHeight * 0.75 : 0.0;
+
+    // Load once per item. Building the future inline refetched the item
+    // (and its episodes) on every rebuild, including each time the bar
+    // changed while scrolling.
+    final details = useMemoized(() => _loadDetails(ref), [itemId]);
+    final title = useFuture(details).data?.name;
 
     useEffect(() {
       listener() {
-        if (scrollController.position.pixels > 0) {
-          appBarColorTransaparent.value = false;
-        } else {
-          appBarColorTransaparent.value = true;
-        }
+        appBarColorTransaparent.value =
+            scrollController.position.pixels <= barThreshold;
       }
 
       scrollController.addListener(listener);
@@ -59,19 +71,24 @@ class DetailScreen extends HookConsumerWidget {
       };
     }, [scrollController]);
 
-    ref.read(apiProvider).getWatchlist().then((value) {
-      onWatchlist.value =
-          value.where((element) => element.id == itemId).isNotEmpty;
-    });
+    useEffect(() {
+      ref.read(apiProvider).getWatchlist().then((value) {
+        onWatchlist.value =
+            value.where((element) => element.id == itemId).isNotEmpty;
+      }).ignore();
+      return null;
+    }, [itemId]);
 
-    final layout = JfxLayout.scalingLayout(context);
-    final featuredPosterHeight = layout.tileHeight * 1.3;
+    // iOS: room for the nav bar above the poster, so the back button
+    // doesn't sit on top of it.
+    final headerTop = MediaQuery.of(context).padding.top +
+        (ios ? kMinInteractiveDimensionCupertino : 0);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: isCupertino(context)
-          // iOS: see-through over the artwork, blurred bar once scrolled.
-          ? adaptiveAppBar(context, transparent: appBarColorTransaparent.value)
+      appBar: ios
+          ? _iosBar(context,
+              transparent: appBarColorTransaparent.value, title: title)
           : appBarColorTransaparent.value
               ? AppBar(
                   backgroundColor: Colors.transparent,
@@ -92,7 +109,7 @@ class DetailScreen extends HookConsumerWidget {
                   ),
                 ),
       body: FutureBuilder(
-          future: _loadDetails(ref),
+          future: details,
           builder: (context, AsyncSnapshot<BaseItemDto> snapshot) {
             BaseItemDto data = SkeletonItem.baseItemDto;
             if (snapshot.hasError) {
@@ -120,12 +137,14 @@ class DetailScreen extends HookConsumerWidget {
                 alignment: Alignment.topCenter,
                 child: SingleChildScrollView(
                   controller: scrollController,
+                  // Clear of the floating tab bar at the end.
+                  padding: EdgeInsets.only(
+                      bottom: MediaQuery.paddingOf(context).bottom),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
-                        height: featuredPosterHeight +
-                            MediaQuery.of(context).padding.top,
+                        height: featuredPosterHeight + headerTop,
                         child: Stack(
                           children: [
                             Stack(
@@ -162,10 +181,7 @@ class DetailScreen extends HookConsumerWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      SizedBox(
-                                        height:
-                                            MediaQuery.of(context).padding.top,
-                                      ),
+                                      SizedBox(height: headerTop),
                                       SizedBox(
                                           height: featuredPosterHeight,
                                           child: JfxTile(
@@ -416,6 +432,47 @@ class DetailScreen extends HookConsumerWidget {
               );
             }
           }),
+    );
+  }
+
+  /// iOS bar. Over the artwork: no background, and a round dimmed back
+  /// button that reads on any picture. Scrolled: the system bar material
+  /// with the item's name, and the standard tinted back chevron.
+  PreferredSizeWidget _iosBar(BuildContext context,
+      {required bool transparent, String? title}) {
+    return CupertinoNavigationBar(
+      transitionBetweenRoutes: false,
+      automaticBackgroundVisibility: false,
+      backgroundColor: transparent ? const Color(0x00000000) : null,
+      border: transparent
+          ? null
+          : const Border(
+              bottom: BorderSide(color: Color(0x4D000000), width: 0.0)),
+      leading: transparent
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(32, 32),
+                onPressed: () => Navigator.maybePop(context),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0x66000000),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.chevron_left,
+                      color: Color(0xFFFFFFFF), size: 18),
+                ),
+              ),
+            )
+          : null,
+      middle: AnimatedOpacity(
+        opacity: transparent || title == null ? 0 : 1,
+        duration: const Duration(milliseconds: 150),
+        child: Text(title ?? '', overflow: TextOverflow.ellipsis),
+      ),
     );
   }
 

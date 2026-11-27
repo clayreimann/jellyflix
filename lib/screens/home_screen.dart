@@ -61,6 +61,8 @@ class HomeScreen extends HookConsumerWidget {
 
     return Scaffold(
       body: SingleChildScrollView(
+        // iOS: clear of the floating tab bar at the end.
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,8 +121,7 @@ class HomeScreen extends HookConsumerWidget {
                 blurHashMapping: (e) =>
                     e.imageBlurHashes?.primary?.values.first,
                 titleMapping: (e) => e.name!,
-                subtitleMapping: (e) =>
-                    e.productionYear?.toString() ?? "",
+                subtitleMapping: (e) => e.productionYear?.toString() ?? "",
                 title: AppLocalizations.of(context)!.continueWatching,
                 overlay: (int index, BaseItemDto element) =>
                     PlaybackProgressOverlay(

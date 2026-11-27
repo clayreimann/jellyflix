@@ -500,6 +500,7 @@ class ProfileScreen extends HookConsumerWidget {
                 ),
               ),
             ),
+            const IosBottomInset(),
           ],
         ),
       );

@@ -53,32 +53,21 @@ class ResponsiveNavigationBar extends HookConsumerWidget {
       // CupertinoTabBar. It stays at every width, including landscape.
       return UIKitTabScaffold(
         tabBar: _uikitTabBar(context, selectedIndex.value, onTabTapped),
-        body: Builder(builder: (context) {
-          // The bar floats over the body and reports its height as the
-          // body's bottom padding. Keep the pages above it (lists here
-          // don't all pad themselves), and give snackbars a Scaffold that
-          // ends at the bar so they float just above it.
-          final bottom = MediaQuery.paddingOf(context).bottom;
-          return ColoredBox(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: bottom),
-              child: MediaQuery.removePadding(
-                context: context,
-                removeBottom: true,
-                child: Scaffold(
-                  body: SafeArea(
-                    // In landscape the notch or Dynamic Island sits on one
-                    // side; keep every page's content clear of it.
-                    top: false,
-                    bottom: false,
-                    child: navigationShell,
-                  ),
-                ),
-              ),
+        // The glass bar floats over the pages, as in UIKit: content
+        // scrolls under it, and the bar's height arrives as the bottom
+        // padding that each page's scroll view leaves at its end.
+        body: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Scaffold(
+            body: SafeArea(
+              // In landscape the notch or Dynamic Island sits on one side;
+              // keep every page's content clear of it.
+              top: false,
+              bottom: false,
+              child: navigationShell,
             ),
-          );
-        }),
+          ),
+        ),
       );
     }
 

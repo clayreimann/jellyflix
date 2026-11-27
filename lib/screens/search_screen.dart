@@ -150,6 +150,7 @@ class SearchScreen extends HookConsumerWidget {
               SliverFillRemaining(hasScrollBody: false, child: emptyHint)
             else
               SliverToBoxAdapter(child: results),
+            const IosBottomInset(),
           ],
         ),
       );
